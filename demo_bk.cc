@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "api/audio/echo_canceller3_factory.h"
 #include "api/audio/echo_canceller3_config.h"
 #include "api/audio/audio_frame.h"
@@ -6,8 +8,6 @@
 
 #include "wavio/wavreader.h"
 #include "wavio/wavwriter.h"
-
-#include <iostream>
 
 using namespace webrtc;
 using namespace std;
@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
 		// aec_linear_audio->CopyTo(config, &aec_frame.data());
 		//memcpy(aec_frame.data_, data, samples_per_frame)
 		//memcpy(aec_tmp, aec_frame.data(), 320);
-		aec_audio.CopyTo(out_config, aec_tmp)
+		aec_audio->CopyTo(out_config, reinterpret_cast<int16_t*>(aec_tmp));
 		
 		wav_write_data(h_linear_out, aec_tmp, 320);
 	}
