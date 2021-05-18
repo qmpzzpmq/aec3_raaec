@@ -46,13 +46,14 @@ int main(int argc, char* argv[])
 {
 	if (argc != 4)
 	{
-		cerr << "usage: ./demo ref.wav rec.wav out.wav" << endl;
+		cerr << "usage: ./demo ref.wav rec.wav linear_out.wav out.wav" << endl;
 		return -1;
 	}
 	cout << "======================================" << endl
 		<< "ref file is: " << argv[1] << endl
 		<< "rec file is: " << argv[2] << endl
-		<< "out file is: " << argv[3] << endl
+		<< "linear out file is: " << argv[3] << endl
+		<< "out file is: " << argv[4] << endl
 		<< "======================================" << endl;
 
 	void* h_ref = wav_read_open(argv[1]);
@@ -119,8 +120,8 @@ int main(int argc, char* argv[])
 	AudioFrame ref_frame, aec_frame;
 	int a;
 
-	void* h_out = wav_write_open(argv[3], rec_sample_rate, rec_bits_per_sample, rec_channels);
-	void* h_linear_out = wav_write_open("linear.wav", kLinearOutputRateHz, rec_bits_per_sample, rec_channels);
+	void* h_linear_out = wav_write_open(argv[3], kLinearOutputRateHz, rec_bits_per_sample, rec_channels);
+	void* h_out = wav_write_open(argv[4], rec_sample_rate, rec_bits_per_sample, rec_channels);
 
 	int samples_per_frame = sample_rate / 100;
 	int bytes_per_frame = samples_per_frame * bits_per_sample / 8;
@@ -132,8 +133,7 @@ int main(int argc, char* argv[])
 	cout << "processing total " << total <<" audio frames ..." << endl;
 	while (current++ < total) 
 	{
-		// print_progress(current, total);
-		cout << "Processing: " << current << "/" << total << endl;
+		print_progress(current, total);
 		wav_read_data(h_ref, ref_tmp, bytes_per_frame);
 		wav_read_data(h_rec, aec_tmp, bytes_per_frame);
 
@@ -153,16 +153,10 @@ int main(int argc, char* argv[])
 		echo_controler->ProcessCapture(aec_audio.get(), aec_linear_audio.get(), false);
 		// aec_audio->MergeFrequencyBands();
 
-		// aec_audio->CopyTo(config, aec_frame.data());
-		// memcpy(aec_tmp, aec_frame.data(), bytes_per_frame);
-		// wav_write_data(h_out, aec_tmp, bytes_per_frame);
-
-		aec_frame.UpdateFrame(0, nullptr, kLinearOutputRateHz / 100, kLinearOutputRateHz, AudioFrame::kNormalSpeech, AudioFrame::kVadActive, 1);
-		// aec_linear_audio->CopyTo(config, &aec_frame.data());
-		//memcpy(aec_frame.data_, data, samples_per_frame)
-		//memcpy(aec_tmp, aec_frame.data(), 320);
 		aec_audio->CopyTo(out_config, reinterpret_cast<int16_t*>(aec_tmp));
-		
+		wav_write_data(h_out, aec_tmp, 320);
+
+		aec_linear_audio->CopyTo(out_config, reinterpret_cast<int16_t*>(aec_tmp));
 		wav_write_data(h_linear_out, aec_tmp, 320);
 	}
 
