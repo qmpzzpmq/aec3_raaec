@@ -38,14 +38,10 @@ link_libraries(
             glib-2.0
             )
 
-# add_subdirectory(src)
-
 add_executable(unit_test unit_test.cc)
 target_link_libraries(unit_test PUBLIC ${EXTRA_LIBS})
 
 add_executable(demo demo.cc)
 target_link_libraries(demo PUBLIC ${EXTRA_LIBS})
-add_compile_options("-stdlib=libc++")
-add_link_options("-stdlib=libc++")
 add_definitions(-DWEBRTC_APM_DEBUG_DUMP=${WEBRTC_APM_DEBUG_DUMP})
 add_definitions(-DWEBRTC_POSIX)
