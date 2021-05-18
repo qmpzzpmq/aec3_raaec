@@ -5,6 +5,7 @@
 #include "api/audio/audio_frame.h"
 #include "modules/audio_processing/audio_buffer.h"
 #include "modules/audio_processing/high_pass_filter.h"
+#include "modules/audio_processing/aec3/echo_canceller3.cc"
 
 #include "wavio/wavreader.h"
 #include "wavio/wavwriter.h"
@@ -82,13 +83,14 @@ int main(int argc, char* argv[])
 	if (ref_format != rec_format ||
 		ref_channels != rec_channels ||
 		ref_sample_rate != rec_sample_rate ||
-		ref_bits_per_sample != ref_bits_per_sample) 
+		ref_bits_per_sample != rec_bits_per_sample) 
 	{
 		cerr << "ref file format != rec file format" << endl;
 		return -1;
 	}
 
-	EchoCanceller3Config aec_config;
+	// EchoCanceller3Config aec_config;
+	auto aec_config = EchoCanceller3::CreateDefaultConfig(ref_channels, rec_channels);
 	aec_config.filter.export_linear_aec_output = true;
 	EchoCanceller3Factory aec_factory = EchoCanceller3Factory(aec_config);
 	std::unique_ptr<EchoControl> echo_controler = aec_factory.Create(ref_sample_rate, ref_channels, rec_channels);
@@ -127,10 +129,11 @@ int main(int argc, char* argv[])
 	int current = 0;
 	unsigned char* ref_tmp = new unsigned char[bytes_per_frame];
 	unsigned char* aec_tmp = new unsigned char[bytes_per_frame];
-	cout << "processing audio frames ..." << endl;
+	cout << "processing total " << total <<" audio frames ..." << endl;
 	while (current++ < total) 
 	{
-		print_progress(current, total);
+		// print_progress(current, total);
+		cout << "Processing: " << current << "/" << total << endl;
 		wav_read_data(h_ref, ref_tmp, bytes_per_frame);
 		wav_read_data(h_rec, aec_tmp, bytes_per_frame);
 
@@ -140,15 +143,15 @@ int main(int argc, char* argv[])
 		ref_audio->CopyFrom(ref_frame.data(), config);
 		aec_audio->CopyFrom(aec_frame.data(), config);
 
-		ref_audio->SplitIntoFrequencyBands();
+		// ref_audio->SplitIntoFrequencyBands();
 		echo_controler->AnalyzeRender(ref_audio.get());
-		ref_audio->MergeFrequencyBands();
+		// ref_audio->MergeFrequencyBands();
 		echo_controler->AnalyzeCapture(aec_audio.get());
-		aec_audio->SplitIntoFrequencyBands();
+		// aec_audio->SplitIntoFrequencyBands();
 		hp_filter->Process(aec_audio.get(), true);
 		echo_controler->SetAudioBufferDelay(0);
 		echo_controler->ProcessCapture(aec_audio.get(), aec_linear_audio.get(), false);
-		aec_audio->MergeFrequencyBands();
+		// aec_audio->MergeFrequencyBands();
 
 		// aec_audio->CopyTo(config, aec_frame.data());
 		// memcpy(aec_tmp, aec_frame.data(), bytes_per_frame);

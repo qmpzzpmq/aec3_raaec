@@ -10,6 +10,7 @@ project(AEC3 VERSION 1.0)
 
 set(WEBRTC_SRC /data1/tanghaoyu/webrtc/src)
 set(WEBRTC_COMPILED /data1/tanghaoyu/webrtc/src/out/Release)
+set(WEBRTC_APM_DEBUG_DUMP 0)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -20,6 +21,7 @@ include_directories(
                    ${WEBRTC_SRC}
                    ${WEBRTC_SRC}/third_party/abseil-cpp
                    ${WEBRTC_SRC}/third_party/tcmalloc
+                   ${WEBRTC_SRC}/third_party/blink
                    /usr/include/glib-2.0
                    /usr/lib/glib-2.0/include
                    )
@@ -45,3 +47,5 @@ add_executable(demo demo.cc)
 target_link_libraries(demo PUBLIC ${EXTRA_LIBS})
 add_compile_options("-stdlib=libc++")
 add_link_options("-stdlib=libc++")
+add_definitions(-DWEBRTC_APM_DEBUG_DUMP=${WEBRTC_APM_DEBUG_DUMP})
+add_definitions(-DWEBRTC_POSIX)

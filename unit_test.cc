@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
   unsigned int ref_data_length;
 
   cout << "======================================" << endl
-    << "in file is: " << argv[1] << endl;
+    << "In file is: " << argv[1] << endl;
   
   void* h_ref = wav_read_open(argv[1]);
   int res = wav_get_header(h_ref, &ref_format, &ref_channels, &ref_sample_rate, &ref_bits_per_sample, &ref_data_length);
@@ -63,4 +63,15 @@ int main(int argc, char* argv[])
   int ref_samples = ref_data_length * 8 / ref_bits_per_sample;
  
   print_wav_information(argv[1], ref_format, ref_channels, ref_sample_rate, ref_bits_per_sample, ref_data_length);
+  int current = 0;
+  int samples_per_frame = ref_sample_rate / 100;
+  int total = ref_samples / (samples_per_frame);
+  int bytes_per_frame = samples_per_frame * ref_bits_per_sample / 8;
+  unsigned char* ref_tmp = new unsigned char[bytes_per_frame];
+  while (current++ < total) 
+  {
+    cout << "Processing: " << current << "/" << total << endl;
+    wav_read_data(h_ref, ref_tmp, bytes_per_frame);
+  }
+
 }
