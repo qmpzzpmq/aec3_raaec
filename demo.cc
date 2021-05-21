@@ -5,7 +5,7 @@
 #include "api/audio/audio_frame.h"
 #include "modules/audio_processing/audio_buffer.h"
 #include "modules/audio_processing/high_pass_filter.h"
-#include "modules/audio_processing/aec3/echo_canceller3.cc"
+#include "modules/audio_processing/aec3/echo_canceller3.h"
 
 #include "wavio/wavreader.h"
 #include "wavio/wavwriter.h"
