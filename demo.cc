@@ -1,6 +1,5 @@
 #include <iostream>
 
-#include "api/audio/echo_canceller3_factory.h"
 #include "api/audio/echo_canceller3_config.h"
 #include "api/audio/audio_frame.h"
 #include "modules/audio_processing/audio_buffer.h"
@@ -9,6 +8,9 @@
 
 #include "wavio/wavreader.h"
 #include "wavio/wavwriter.h"
+
+// a strange bug fix by this
+#include "modules/audio_processing/aec3/echo_canceller3.cc"
 
 using namespace webrtc;
 using namespace std;
@@ -44,7 +46,7 @@ void print_progress(int current, int total)
 
 int main(int argc, char* argv[])
 {
-	if (argc != 4)
+	if (argc != 5)
 	{
 		cerr << "usage: ./demo ref.wav rec.wav linear_out.wav out.wav" << endl;
 		return -1;
@@ -90,10 +92,9 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	// EchoCanceller3Config aec_config;
-	auto aec_config = EchoCanceller3::CreateDefaultConfig(ref_channels, rec_channels);
+        EchoCanceller3Config aec_config = EchoCanceller3::CreateDefaultConfig(ref_channels, rec_channels);
 	aec_config.filter.export_linear_aec_output = true;
-	EchoCanceller3Factory aec_factory = EchoCanceller3Factory(aec_config);
+	// std::unique_ptr<EchoCanceller3> echo_controler = std::make_unique<EchoCanceller3>(aec_config, ref_sample_rate, ref_channels, rec_channels);
 	std::unique_ptr<EchoControl> echo_controler = aec_factory.Create(ref_sample_rate, ref_channels, rec_channels);
 	std::unique_ptr<HighPassFilter> hp_filter = std::make_unique<HighPassFilter>(rec_sample_rate, rec_channels);
 
@@ -118,7 +119,6 @@ int main(int argc, char* argv[])
 		kLinearOutputRateHz, config.num_channels());
 
 	AudioFrame ref_frame, aec_frame;
-	int a;
 
 	void* h_linear_out = wav_write_open(argv[3], kLinearOutputRateHz, rec_bits_per_sample, rec_channels);
 	void* h_out = wav_write_open(argv[4], rec_sample_rate, rec_bits_per_sample, rec_channels);

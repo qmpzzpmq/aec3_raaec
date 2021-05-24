@@ -25,6 +25,7 @@ include_directories(
                    /usr/include/glib-2.0
                    /usr/lib/glib-2.0/include
                    )
+
 link_directories(
                 /usr/lib/x86_64-linux-gnu
                 ${WEBRTC_COMPILED}/obj
