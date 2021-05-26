@@ -5,6 +5,8 @@ import os
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
+import numpy as np
+
 def get_parser():
     parser = argparse.ArgumentParser(description='generate webrtc aec3')
     parser.add_argument('--webrtc_src', type=str, required=True)
@@ -45,6 +47,7 @@ def main(cmd_args):
                 '/usr/lib/x86_64-linux-gnu',
                 os.path.join(args.webrtc_compiled, "obj"),
                 '/usr/lib',
+                np.get_include(),
             ],
             libraries=[
                 'webrtc',
@@ -63,6 +66,7 @@ def main(cmd_args):
                 "-lc++abi",
             ],
             language="c++",
+            define_macros=[('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')]
             # extra_compile_args=["-std=c++14",  "-v"],
             # extra_link_args=["-stdlib=libc++", ],
         )

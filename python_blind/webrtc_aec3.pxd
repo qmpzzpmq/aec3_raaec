@@ -1,7 +1,12 @@
 # distutils: language = c++
 
+from libc.stdint cimport int16_t
+
 from libcpp cimport bool
-from libcpp.memory cimport unique_ptr, allocator
+from libcpp.cast cimport reinterpret_cast
+from libcpp.memory cimport unique_ptr, allocator, make_unique
+from libcpp.vector cimport vector
+
 
 cdef extern from "api/audio/echo_canceller3_config.h" namespace "webrtc":
     cdef struct Filter:
@@ -25,6 +30,8 @@ cdef extern from "api/audio/audio_frame.h" namespace "webrtc":
 
 cdef extern from "modules/audio_processing/audio_buffer.h" namespace "webrtc":
     cdef cppclass AudioBuffer:
+        void CopyFrom(
+            const int16_t* const interleaved_data, const EchoCanceller3Config stream_config)
         pass
 
 cdef extern from "modules/audio_processing/aec3/echo_canceller3.h" namespace "webrtc":
