@@ -44,13 +44,13 @@ cdef class AEC3:
         cdef int samples_per_frame = int(fs / 100)
         self.bytes_per_frame = int(samples_per_frame * bits_per_sample / 8)
         self.hp_filter = new webrtc_HighPassFilter(fs, num_rec_channel)
-        self.aec3_config.filter.export_linear_aec_output = True
+        cdef webrtc_EchoCanceller3Config aec3_config
+        aec3_config.filter.export_linear_aec_output = True
+        self.aec3_config = aec3_config
         cdef webrtc_EchoCanceller3Factory *aec3_factory = new webrtc_EchoCanceller3Factory(
             self.aec3_config)
-        # self.echo_controler = aec3_factory[0].Create(
-        #     fs, num_ref_channel, num_rec_channel)
         self.echo_controler = aec3_factory[0].Create(
-            16000, 1, 1)
+            fs, num_ref_channel, num_rec_channel)
 
     def process_chunk(
             self,
