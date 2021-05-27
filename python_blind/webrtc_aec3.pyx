@@ -28,20 +28,22 @@ cdef class AEC3:
         webrtc_HighPassFilter *hp_filter
         webrtc_StreamConfig *config
         readonly int fs
+        readonly int out_fs
         readonly int num_ref_channel
         readonly int num_rec_channel
-        readonly int bytes_per_frame
+        readonly int samples_per_frame
         readonly int bits_per_sample
 
     def __cinit__(
             self, int num_ref_channel=1, int num_rec_channel=1,
-            int fs=16000, int bits_per_sample=16):
+            int fs=16000, int bits_per_sample=16, out_fs=None, float len_frame=0.1):
         self.num_ref_channel = num_ref_channel
         self.num_rec_channel = num_rec_channel
         self.fs = fs
+        if out_fs == None:
+            self.out_fs = fs
         self.bits_per_sample = bits_per_sample
-        cdef int samples_per_frame = int(fs / 100)
-        self.bytes_per_frame = int(samples_per_frame * bits_per_sample / 8)
+        self.samples_per_frame = int(fs * len_frame)
         self.hp_filter = new webrtc_HighPassFilter(fs, num_rec_channel)
         cdef webrtc_EchoCanceller3Config aec3_config
         aec3_config.filter.export_linear_aec_output = True
@@ -52,13 +54,36 @@ cdef class AEC3:
             fs, num_ref_channel, num_rec_channel)
         print("__cinit__ method executed")
 
-    cpdef process_chunk(
+    cdef process_chunk(
             self,
-            cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] ref,
-            cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] rec,
-            cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] linear,
-            cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] out,
+            webrtc_AudioBuffer *ref_buffer,
+            webrtc_AudioBuffer *rec_buffer,
+            webrtc_AudioBuffer *linear_buffer,
+            webrtc_AudioBuffer *out_buffer,
         ):
+        self.echo_controler.get().AnalyzeRender(ref_buffer)
+        self.echo_controler.get().AnalyzeCapture(rec_buffer)
+        self.hp_filter[0].Process(rec_buffer, True);
+        self.echo_controler.get().SetAudioBufferDelay(0)
+        self.echo_controler.get().ProcessCapture(rec_buffer, linear_buffer, False)
+        print("process_chunk method executed")
+
+    def linear_run(
+            self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref,
+            cnp.ndarray[CNP_DTYPE_t, ndim=1] rec
+        ):
+        cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] linear = np.zeros_like(rec)
+        cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] out = np.zeros_like(rec)
+        cdef int start
+        cdef int end
+        cdef DTYPE_t* ref_ptr = &ref[0]
+        cdef DTYPE_t* rec_ptr = &rec[0]
+        cdef DTYPE_t* linear_ptr = &linear[0]
+        cdef DTYPE_t* out_ptr = &out[0]
+
+        cdef int total = int(len(rec) / self.samples_per_frame) \
+            if len(rec) < len(ref) else int(len(ref) / self.samples_per_frame)
+
         cdef webrtc_AudioBuffer *ref_buffer = new webrtc_AudioBuffer(
             self.fs, self.num_ref_channel,
             self.fs, self.num_ref_channel,
@@ -74,41 +99,30 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
+        cdef webrtc_AudioBuffer *out_buffer = new webrtc_AudioBuffer(
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+        )
+        for current in range(total):
+            start = current * self.samples_per_frame
+            end = start + self.samples_per_frame
+            ref_slice = ref[start:end]
+            rec_slice = rec[start:end]
+            
+            ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
+            rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
+            self.process_chunk(ref_buffer, rec_buffer, linear_buffer, out_buffer)
 
-        cdef DTYPE_t* ref_ptr = &ref[0]
-        cdef DTYPE_t* rec_ptr = &rec[0]
-        ref_buffer[0].CopyFrom(ref_ptr, self.config[0])
-        rec_buffer[0].CopyFrom(rec_ptr, self.config[0])
-
-        self.echo_controler.get().AnalyzeRender(ref_buffer)
-        self.echo_controler.get().AnalyzeCapture(rec_buffer)
-        self.hp_filter[0].Process(rec_buffer, True);
-        self.echo_controler.get().SetAudioBufferDelay(0)
-        self.echo_controler.get().ProcessCapture(rec_buffer, linear_buffer, False)
-
-        cdef DTYPE_t* linear_ptr = &linear[0]
-        linear_buffer[0].CopyTo(self.config[0], linear_ptr)
-
-        cdef DTYPE_t* out_ptr = &out[0]
-        rec_buffer[0].CopyTo(self.config[0], out_ptr)
-
-        free(ref_ptr)
-        free(rec_ptr)
-        # free(linear_ptr)
-        # free(out_ptr)
-        print("free done")
+            linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
+            out_buffer[0].CopyTo(self.config[0], out_ptr + start)
+        
         del ref_buffer
         del rec_buffer
         del linear_buffer
-        print("del done")
-        print("process_chunk method executed")
-
-    def run(self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref, cnp.ndarray[CNP_DTYPE_t, ndim=1] rec):
-        out = np.zeros_like(rec)
-        linear = np.zeros_like(rec)
-        self.process_chunk(ref, rec, linear, out)
+        del out_buffer
         print("__call__ method executed")
-
+        return linear, out
 
     def __dealloc__(self):
         if self.hp_filter != NULL:
