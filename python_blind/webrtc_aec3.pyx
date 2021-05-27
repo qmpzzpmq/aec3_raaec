@@ -1,5 +1,6 @@
 # distutils: language=c++
 
+from tqdm import tqdm
 import numpy as np
 cimport numpy as cnp
 
@@ -66,7 +67,6 @@ cdef class AEC3:
         self.hp_filter[0].Process(rec_buffer, True);
         self.echo_controler.get().SetAudioBufferDelay(0)
         self.echo_controler.get().ProcessCapture(rec_buffer, linear_buffer, False)
-        print("process_chunk method executed")
 
     def linear_run(
             self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref,
@@ -104,19 +104,19 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
-        for current in range(total):
+        for current in tqdm(range(total)):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
             ref_slice = ref[start:end]
             rec_slice = rec[start:end]
-            
+
             ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
             rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
             self.process_chunk(ref_buffer, rec_buffer, linear_buffer, out_buffer)
 
             linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
             out_buffer[0].CopyTo(self.config[0], out_ptr + start)
-        
+
         del ref_buffer
         del rec_buffer
         del linear_buffer
