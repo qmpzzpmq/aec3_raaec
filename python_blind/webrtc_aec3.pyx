@@ -38,14 +38,14 @@ cdef class AEC3:
 
     def __cinit__(
             self, int num_ref_channel=1, int num_rec_channel=1,
-            int fs=16000, int bits_per_sample=16, out_fs=None, float len_frame=0.01):
+            int fs=16000, int bits_per_sample=16, out_fs=None):
         self.num_ref_channel = num_ref_channel
         self.num_rec_channel = num_rec_channel
         self.fs = fs
         if out_fs == None:
             self.out_fs = fs
         self.bits_per_sample = bits_per_sample
-        self.samples_per_frame = int(fs * len_frame)
+        self.samples_per_frame = int(fs / 100)
         self.hp_filter = new webrtc_HighPassFilter(fs, num_rec_channel)
         cdef webrtc_EchoCanceller3Config aec3_config
         aec3_config.filter.export_linear_aec_output = True
@@ -69,7 +69,7 @@ cdef class AEC3:
         self.echo_controler.get().SetAudioBufferDelay(0)
         self.echo_controler.get().ProcessCapture(rec_buffer, linear_buffer, False)
 
-    def linear_run(
+    def linear_test(
             self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref,
             cnp.ndarray[CNP_DTYPE_t, ndim=1] rec,
             str linear_path = "",
@@ -124,10 +124,10 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
-        # print(f"ref buffer num_frames {ref_buffer[0].num_frames()}")
-        # print(f"rec buffer num_frames {rec_buffer[0].num_frames()}")
-        # print(f"linear buffer num_frames {linear_buffer[0].num_frames()}")
-        # print(f"out buffer num_frames {out_buffer[0].num_frames()}")
+        print(f"ref buffer num_frames {ref_buffer[0].num_frames()}")
+        print(f"rec buffer num_frames {rec_buffer[0].num_frames()}")
+        print(f"linear buffer num_frames {linear_buffer[0].num_frames()}")
+        print(f"out buffer num_frames {out_buffer[0].num_frames()}")
         for current in tqdm(range(total)):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
@@ -151,6 +151,60 @@ cdef class AEC3:
             linear_wav.close()
         if out_path is not "":
             out_wav.close()
+        print("__call__ method executed")
+        return linear, out
+
+    def linear_run(
+            self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref,
+            cnp.ndarray[CNP_DTYPE_t, ndim=1] rec,
+        ):
+        cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] linear = np.zeros_like(rec)
+        cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] out = np.zeros_like(rec)
+        cdef int start
+        cdef int end
+        cdef DTYPE_t* ref_ptr = &ref[0]
+        cdef DTYPE_t* rec_ptr = &rec[0]
+        cdef DTYPE_t* linear_ptr = &linear[0]
+        cdef DTYPE_t* out_ptr = &out[0]
+
+        cdef int total = int(len(rec) / self.samples_per_frame) \
+            if len(rec) < len(ref) else int(len(ref) / self.samples_per_frame)
+
+        cdef webrtc_AudioBuffer *ref_buffer = new webrtc_AudioBuffer(
+            self.fs, self.num_ref_channel,
+            self.fs, self.num_ref_channel,
+            self.fs, self.num_ref_channel,
+        )
+        cdef webrtc_AudioBuffer *rec_buffer = new webrtc_AudioBuffer(
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+        )
+        cdef webrtc_AudioBuffer *linear_buffer = new webrtc_AudioBuffer(
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+        )
+        cdef webrtc_AudioBuffer *out_buffer = new webrtc_AudioBuffer(
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+            self.fs, self.num_rec_channel,
+        )
+        for current in tqdm(range(total)):
+            start = current * self.samples_per_frame
+            end = start + self.samples_per_frame
+
+            ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
+            rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
+            self.process_chunk(ref_buffer, rec_buffer, linear_buffer, out_buffer)
+
+            linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
+            out_buffer[0].CopyTo(self.config[0], out_ptr + start)
+
+        del ref_buffer
+        del rec_buffer
+        del linear_buffer
+        del out_buffer
         print("__call__ method executed")
         return linear, out
 

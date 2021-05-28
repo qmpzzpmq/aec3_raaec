@@ -31,9 +31,7 @@ def main(cmd_args):
     aec3 = AEC3(fs=args.fs,)
     print("AEC3 runing")
     linear, out = aec3.linear_run(
-        ref, rec,
-        linear_path="linear_test.wav",
-        out_path="out_test.wav")
+        ref, rec,)
 
     print(f"writing linear from {args.linear}")
     sf.write(args.linear, linear, args.fs, 'PCM_16')

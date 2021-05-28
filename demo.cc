@@ -133,7 +133,8 @@ int main(int argc, char* argv[])
 	int current = 0;
 	unsigned char* ref_tmp = new unsigned char[bytes_per_frame];
 	unsigned char* aec_tmp = new unsigned char[bytes_per_frame];
-	cout << "processing total " << total <<" audio frames ..." << endl;
+	cout << "processing total " << total <<" audio frames with each frame " << samples_per_frame << endl;
+
 	while (current++ < total) 
 	{
 		print_progress(current, total);
