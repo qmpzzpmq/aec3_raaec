@@ -1,6 +1,7 @@
 # distutils: language=c++
 
 from tqdm import tqdm
+import wave
 import numpy as np
 cimport numpy as cnp
 
@@ -37,7 +38,7 @@ cdef class AEC3:
 
     def __cinit__(
             self, int num_ref_channel=1, int num_rec_channel=1,
-            int fs=16000, int bits_per_sample=16, out_fs=None, float len_frame=0.1):
+            int fs=16000, int bits_per_sample=16, out_fs=None, float len_frame=0.01):
         self.num_ref_channel = num_ref_channel
         self.num_rec_channel = num_rec_channel
         self.fs = fs
@@ -70,7 +71,10 @@ cdef class AEC3:
 
     def linear_run(
             self, cnp.ndarray[CNP_DTYPE_t, ndim=1] ref,
-            cnp.ndarray[CNP_DTYPE_t, ndim=1] rec
+            cnp.ndarray[CNP_DTYPE_t, ndim=1] rec,
+            str linear_path = "",
+            str out_path = "",
+            int chunk = -1,
         ):
         cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] linear = np.zeros_like(rec)
         cdef cnp.ndarray[CNP_DTYPE_t, ndim=1, mode = 'c'] out = np.zeros_like(rec)
@@ -83,6 +87,22 @@ cdef class AEC3:
 
         cdef int total = int(len(rec) / self.samples_per_frame) \
             if len(rec) < len(ref) else int(len(ref) / self.samples_per_frame)
+        if chunk > 0:
+            print(f"force total to {chunk}")
+            total = chunk
+        if linear_path is not "":
+            linear_wav = wave.open(linear_path, mode="wb")
+            linear_wav.setnchannels(self.num_rec_channel)
+            linear_wav.setsampwidth(2)
+            linear_wav.setframerate(self.fs)
+            linear_wav.setnframes(min(len(rec), len(ref)))
+        if out_path is not "":
+            out_wav = wave.open(out_path
+            , mode="wb")
+            out_wav.setnchannels(self.num_rec_channel)
+            out_wav.setsampwidth(2)
+            out_wav.setframerate(self.fs)
+            out_wav.setnframes(min(len(rec), len(ref)))
 
         cdef webrtc_AudioBuffer *ref_buffer = new webrtc_AudioBuffer(
             self.fs, self.num_ref_channel,
@@ -104,11 +124,13 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
+        # print(f"ref buffer num_frames {ref_buffer[0].num_frames()}")
+        # print(f"rec buffer num_frames {rec_buffer[0].num_frames()}")
+        # print(f"linear buffer num_frames {linear_buffer[0].num_frames()}")
+        # print(f"out buffer num_frames {out_buffer[0].num_frames()}")
         for current in tqdm(range(total)):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
-            ref_slice = ref[start:end]
-            rec_slice = rec[start:end]
 
             ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
             rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
@@ -116,11 +138,19 @@ cdef class AEC3:
 
             linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
             out_buffer[0].CopyTo(self.config[0], out_ptr + start)
+            if linear_path is not "":
+                linear_wav.writeframes(linear[start:end])
+            if out_path is not "":
+                out_wav.writeframes(out[start:end])
 
         del ref_buffer
         del rec_buffer
         del linear_buffer
         del out_buffer
+        if linear_path is not "":
+            linear_wav.close()
+        if out_path is not "":
+            out_wav.close()
         print("__call__ method executed")
         return linear, out
 

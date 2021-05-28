@@ -48,6 +48,7 @@ cdef extern from "modules/audio_processing/audio_buffer.h" namespace "webrtc":
             size_t output_rate,
             size_t output_num_channels
         )
+        size_t num_frames()
         void CopyFrom(
             const int16_t* const interleaved_data, const StreamConfig& stream_config)
         void CopyTo(const StreamConfig& stream_config, float* const* stacked_data)

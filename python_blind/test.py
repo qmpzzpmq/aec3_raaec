@@ -1,9 +1,6 @@
 import sys
 import argparse
 
-import numpy as np
-
-import librosa
 import soundfile as sf
 
 from webrtc_aec3 import AEC3
@@ -21,7 +18,6 @@ def main(cmd_args):
     parser = get_parser()
     args, _ = parser.parse_known_args(cmd_args)
 
-    print(args)
     print(f"reading ref from {args.ref}")
     ref, fs = sf.read(args.ref, dtype="int16")
     assert fs == args.fs, \
@@ -32,9 +28,12 @@ def main(cmd_args):
         f"the rec {args.ref} fs {fs} is not equal the working fs {args.fs}"
 
     print("building AEC3 obj")
-    aec3 = AEC3(fs=16000)
+    aec3 = AEC3(fs=args.fs,)
     print("AEC3 runing")
-    linear, out = aec3.linear_run(ref, rec)
+    linear, out = aec3.linear_run(
+        ref, rec,
+        linear_path="linear_test.wav",
+        out_path="out_test.wav")
 
     print(f"writing linear from {args.linear}")
     sf.write(args.linear, linear, args.fs, 'PCM_16')
