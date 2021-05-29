@@ -21,8 +21,11 @@ cdef extern from "modules/audio_processing/include/audio_processing.h" namespace
 cdef extern from "api/audio/echo_canceller3_config.h" namespace "webrtc":
     cdef struct Filter:
         bool export_linear_aec_output
+    cdef struct EchoModel:
+        bool model_reverb_in_nonlinear_mode
     cdef struct EchoCanceller3Config:
         Filter filter
+        EchoModel echo_model
 
 cdef extern from "api/audio/echo_canceller3_factory.h" namespace "webrtc":
     cdef cppclass EchoCanceller3Factory:

@@ -38,7 +38,8 @@ cdef class AEC3:
 
     def __cinit__(
             self, int num_ref_channel=1, int num_rec_channel=1,
-            int fs=16000, int bits_per_sample=16, out_fs=None):
+            int fs=16000, int bits_per_sample=16,
+            out_fs=None, pure_linear=False):
         self.num_ref_channel = num_ref_channel
         self.num_rec_channel = num_rec_channel
         self.fs = fs
@@ -49,6 +50,7 @@ cdef class AEC3:
         self.hp_filter = new webrtc_HighPassFilter(fs, num_rec_channel)
         cdef webrtc_EchoCanceller3Config aec3_config
         aec3_config.filter.export_linear_aec_output = True
+        aec3_config.echo_model.model_reverb_in_nonlinear_mode = pure_linear
         self.config = new webrtc_StreamConfig(fs, num_rec_channel, False)
         cdef webrtc_EchoCanceller3Factory *aec3_factory = new webrtc_EchoCanceller3Factory(
             aec3_config)
@@ -61,7 +63,6 @@ cdef class AEC3:
             webrtc_AudioBuffer *ref_buffer,
             webrtc_AudioBuffer *rec_buffer,
             webrtc_AudioBuffer *linear_buffer,
-            webrtc_AudioBuffer *out_buffer,
         ):
         self.echo_controler.get().AnalyzeRender(ref_buffer)
         self.echo_controler.get().AnalyzeCapture(rec_buffer)
@@ -119,25 +120,19 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
-        cdef webrtc_AudioBuffer *out_buffer = new webrtc_AudioBuffer(
-            self.fs, self.num_rec_channel,
-            self.fs, self.num_rec_channel,
-            self.fs, self.num_rec_channel,
-        )
         print(f"ref buffer num_frames {ref_buffer[0].num_frames()}")
         print(f"rec buffer num_frames {rec_buffer[0].num_frames()}")
         print(f"linear buffer num_frames {linear_buffer[0].num_frames()}")
-        print(f"out buffer num_frames {out_buffer[0].num_frames()}")
         for current in tqdm(range(total)):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
 
             ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
             rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
-            self.process_chunk(ref_buffer, rec_buffer, linear_buffer, out_buffer)
+            self.process_chunk(ref_buffer, rec_buffer, linear_buffer)
 
             linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
-            out_buffer[0].CopyTo(self.config[0], out_ptr + start)
+            rec_buffer[0].CopyTo(self.config[0], out_ptr + start)
             if linear_path is not "":
                 linear_wav.writeframes(linear[start:end])
             if out_path is not "":
@@ -146,7 +141,6 @@ cdef class AEC3:
         del ref_buffer
         del rec_buffer
         del linear_buffer
-        del out_buffer
         if linear_path is not "":
             linear_wav.close()
         if out_path is not "":
@@ -185,26 +179,20 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
-        cdef webrtc_AudioBuffer *out_buffer = new webrtc_AudioBuffer(
-            self.fs, self.num_rec_channel,
-            self.fs, self.num_rec_channel,
-            self.fs, self.num_rec_channel,
-        )
         for current in tqdm(range(total)):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
 
             ref_buffer[0].CopyFrom(ref_ptr + start, self.config[0])
             rec_buffer[0].CopyFrom(rec_ptr + start, self.config[0])
-            self.process_chunk(ref_buffer, rec_buffer, linear_buffer, out_buffer)
+            self.process_chunk(ref_buffer, rec_buffer, linear_buffer)
 
             linear_buffer[0].CopyTo(self.config[0], linear_ptr + start)
-            out_buffer[0].CopyTo(self.config[0], out_ptr + start)
+            rec_buffer[0].CopyTo(self.config[0], out_ptr + start)
 
         del ref_buffer
         del rec_buffer
         del linear_buffer
-        del out_buffer
         print("__call__ method executed")
         return linear, out
 
