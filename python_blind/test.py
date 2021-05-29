@@ -46,7 +46,6 @@ def main(cmd_args):
     sf.write(args.linear, linear, args.fs, 'PCM_16')
     print(f"writing out from {args.out}")
     sf.write(args.out, out, args.fs, 'PCM_16')
-    print(f"mean out {np.abs(out).mean()}")
     print("done")
 
 if __name__ == "__main__":
