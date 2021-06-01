@@ -80,3 +80,21 @@ def single_spec_gain(src, gain):
     src = torch.mm(
         torch.diag_embed(gain), src.reshape(b, -1)).reshape(t, f)
     return src
+
+def lengths_sub(x, y, dim=-1):
+    len_x = x.size(dim)
+    len_y = y.size(dim)
+    if len_x < len_y:
+        y_sub, _ = torch.split(y, len_x)
+        return x, y_sub
+    else:
+        x_sub, _ = torch.split(x, len_y)
+        return x_sub, y
+
+def DTD_compute(ref_power, rec_power, threshold=0.001):
+    max_ref = ref_power.max(dim=-1)
+    max_rec = rec_power.max(dim=-1)
+    dtd = torch.ones_like(max_ref, dtype=torch.int) * 2
+    dtd[torch.logical_and(max_ref<threshold, max_rec>threshold)] = 0
+    dtd[torch.logical_and(max_ref>threshold, max_rec<threshold)] = 0
+    return dtd

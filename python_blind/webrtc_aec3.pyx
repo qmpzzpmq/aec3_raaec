@@ -56,7 +56,6 @@ cdef class AEC3:
             aec3_config)
         self.echo_controler = aec3_factory[0].Create(
             fs, num_ref_channel, num_rec_channel)
-        print("__cinit__ method executed")
 
     cdef process_chunk(
             self,
@@ -145,7 +144,6 @@ cdef class AEC3:
             linear_wav.close()
         if out_path is not "":
             out_wav.close()
-        print("__call__ method executed")
         return linear, out
 
     def linear_run(
@@ -193,7 +191,6 @@ cdef class AEC3:
         del ref_buffer
         del rec_buffer
         del linear_buffer
-        print("__call__ method executed")
         return linear, out
 
     def __dealloc__(self):
@@ -201,4 +198,3 @@ cdef class AEC3:
             del self.hp_filter
         if self.config != NULL:
             del self.config
-        print("__dealloc__ method executed")
