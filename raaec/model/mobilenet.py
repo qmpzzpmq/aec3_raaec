@@ -1,11 +1,20 @@
+import logging
+import os
+from typing import Any, Callable, Optional
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import torchaudio as ta
 
-from raaec.aec3.webrtc_aec3 import AEC3
 from raaec.DSP.torch_DSP import lengths_sub
+from raaec.DSP.torch_DSP import common_normalize
+from raaec.utils.set_config import hydra_runner
+from raaec.aec3.webrtc_aec3 import AEC3
+
 
 class Frontend(nn.Module):
     def __init__(self, n_fft=512, hop_length=400):
@@ -13,7 +22,6 @@ class Frontend(nn.Module):
         self.fft = ta.transforms.Spectrogram(n_fft=n_fft, hop_length=hop_length, power=1)
 
     def forward(self, est, ref):
-        lengths_sub(est, ref)
         est_energy = self.fft(est)
         ref_energy = self.fft(ref)
         return torch.cat([est_energy, ref_energy], dim=-1).log10()
@@ -64,12 +72,13 @@ class MASKS_DEC(nn.Module):
         super().__init__()
         self.main = nn.Sequential(
             AEC_InvertedResidual(128, 64, 3),
-            ConvBNReLU(128, 64, (3,4)),
-            nn.Linear(64, 64),
+            ConvBNReLU(64, 64, (3,4)),
         )
+        self.linear = nn.Linear(64, 64)
     def forward(self, x):
-        h = self.main(x)
-        return F.sigmoid(h), h 
+        h1 = self.main(x)
+        h2 = self.linear(h1.transpose(1, 3)).transpose(1, 3)
+        return F.sigmoid(h2), h2 
 
 class DTD_DEC(nn.Module):
     def __init__(self):
@@ -78,8 +87,8 @@ class DTD_DEC(nn.Module):
         self.dec = nn.Linear(88, 3)
     def forward(self, x, condition):
         h = self.enc(x)
-        out = self.dec(torch.cat((h, condition), dim=-1))
-        return F.softmax(x)
+        out = self.dec(torch.cat((h, condition), dim=1).transpose(1,3)).transpose(1,3)
+        return F.softmax(out)
 
 class RAAEC_MODEL(nn.Module):
     def __init__(
@@ -102,17 +111,16 @@ class RAAEC_MODEL(nn.Module):
         self.DTD_dec = DTD_DEC()
 
     def forward(self, ref, rec):
-        est, _, = self.aec3.linear_run(ref, rec)
+        est, _, = self.af.linear_run(ref.numpy(), rec.numpy())
+        est = torch.as_tensor(est, dtype=torch.float, device=ref.device)
+        est, ref = common_normalize([est, ref])
         x = self.frontend(est, ref)
-        h = self.enc(x)
+        h = self.enc(x.unsqueeze(0).unsqueeze(0))
         masks, condition = self.masks_dec(h)
         if not self.training:
             return masks
         DTD = self.DTD_dec(h, condition)
         return masks, DTD
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 def init_model(n_fft=512, hop_length=400, fs=16000):
     return RAAEC_MODEL(
@@ -120,9 +128,13 @@ def init_model(n_fft=512, hop_length=400, fs=16000):
         af=AEC3(fs=fs, pure_linear=True),
     )
 
-if __name__ == "__main__":
+@hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
+def unit_test(cfg: DictConfig):
     raaec = init_model(n_fft=512, hop_length=400, fs=16000)
     raaec.train()
-    ref = ta.load('ref.wav')
-    rec = ta.load('ref.wav')
-    masks, DTD = raaec(ref, rec)
+    ref, _ = ta.load('ref.wav', normalize=False)
+    rec, _ = ta.load('ref.wav', normalize=False)
+    masks, DTD = raaec(ref.squeeze(), rec.squeeze())
+
+if __name__ == "__main__":
+    unit_test()

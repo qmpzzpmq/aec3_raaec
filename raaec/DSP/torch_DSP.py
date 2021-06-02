@@ -68,28 +68,34 @@ def complex_spec_gain(src, gain):
         torch.diag_embed(gain), src.reshape(b, -1)).reshape(b, t, f, c)
     return src
 
-
 def batch_spec_gain(src, gain):
     b, t, f = src.shape
     src = torch.mm(
         torch.diag_embed(gain), src.reshape(b, -1)).reshape(b, t, f)
     return src
 
-def single_spec_gain(src, gain):
-    t, f = src.shape
-    src = torch.mm(
-        torch.diag_embed(gain), src.reshape(b, -1)).reshape(t, f)
-    return src
-
 def lengths_sub(x, y, dim=-1):
     len_x = x.size(dim)
     len_y = y.size(dim)
+    if len_x == len_y:
+        return x, y
     if len_x < len_y:
         y_sub, _ = torch.split(y, len_x)
         return x, y_sub
     else:
         x_sub, _ = torch.split(x, len_y)
         return x_sub, y
+
+def common_normalize(signals, ceil=1.0, dim=-1):
+    max_amplitude = []
+    min_len = float('inf')
+    for signal in signals:
+        max_amplitude.append(signal.abs().max())
+        min_len = min(min_len, signal.size(-1))
+    amplitude_factor = max(max_amplitude)
+    return [
+        torch.index_select(
+            x, dim, torch.tensor(range(0, min_len))) / amplitude_factor for x in signals]
 
 def DTD_compute(ref_power, rec_power, threshold=0.001):
     max_ref = ref_power.max(dim=-1)
