@@ -78,7 +78,7 @@ class MASKS_DEC(nn.Module):
     def forward(self, x):
         h1 = self.main(x)
         h2 = self.linear(h1.transpose(1, 3)).transpose(1, 3)
-        return F.sigmoid(h2), h2 
+        return F.sigmoid(h2), h2
 
 class DTD_DEC(nn.Module):
     def __init__(self):
@@ -130,6 +130,7 @@ def init_model(n_fft=512, hop_length=400, fs=16000):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
+    logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     raaec = init_model(n_fft=512, hop_length=400, fs=16000)
     raaec.train()
     ref, _ = ta.load('ref.wav', normalize=False)
