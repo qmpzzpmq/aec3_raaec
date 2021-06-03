@@ -20,7 +20,7 @@ class RAAEC(pl.LightningModule):
 
     def validation_step(self, *args, **kwargs):
         return super().validation_step(*args, **kwargs)
-    
+
     def test_step(self, *args, **kwargs):
         return super().test_step(*args, **kwargs)
 

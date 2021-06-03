@@ -1,18 +1,21 @@
 import os
 import logging
+import glob
 
+from omegaconf import DictConfig, OmegaConf
 import librosa
 import torch
 import torch.nn as nn
-import torchaudio
+import torchaudio as ta
 import numpy as np
 
 import torch.utils.data as tdata
 import timit_utils as tu
 
 from raaec.DSP.common_DSP import wav_norm
+from raaec.utils.set_config import hydra_runner
 
-class wavdirdataset(tdata.Dataset):
+class WAVDIRDATASET(tdata.Dataset):
     def __init__(
             self, datain, fs=16000, read_dur=None, wav_norm=False):
         super().__init__()
@@ -24,22 +27,22 @@ class wavdirdataset(tdata.Dataset):
             for filename in os.listdir(datain):
                 if "." not in filename:
                     continue
-                _, ext = filename.rsplit(".", 1)
-                if ext != "mp3" and ext != "wav" and ext != "flac":
+                _, ext = os.path.splitext(filename)
+                if ext != ".mp3" and ext != ".wav" and ext != ".flac":
                     continue
                 self.audiolist.append(os.path.join(datain, filename))
         else:
             for filename in open(datain, "r"):
                 filename = filename.strip()
-                _, ext = filename.rsplit(".", 1)
-                if ext != "mp3" and ext != "wav" and ext != "flac":
+                _, ext = os.path.splitext(filename)
+                if ext != ".mp3" and ext != ".wav" and ext != ".flac":
                     continue
                 self.audiolist.append(os.path.join(filename))
 
     def __getitem__(self, index):
-        si, _ = torchaudio.info(self.audiolist[index])
+        si, _ = ta.info(self.audiolist[index])
         num_frames = min(si.rate*self.read_dur, si.length)
-        data, _ = torchaudio.load(
+        data, _ = ta.load(
             self.audiolist[index], normalization=self.wav_norm,
             num_frames=num_frames)
         return data[0, :]
@@ -47,11 +50,11 @@ class wavdirdataset(tdata.Dataset):
     def __len__(self):
         return len(self.audiolist)
 
-class timitdataset(tdata.Dataset):
+class TIMITDATASET(tdata.Dataset):
     def __init__(
             self, subset, dirpath, fs, wav_norm=False):
-        assert os.path.isdir(dirpath)
         super().__init__()
+        assert os.path.isdir(dirpath)
         self.audiolist = list()
         self.wav_norm = wav_norm
         corpus = tu.Corpus(dirpath)
@@ -78,7 +81,7 @@ class timitdataset(tdata.Dataset):
     def __len__(self):
         return self.num_wav
 
-class aecdataset(tdata.Dataset):
+class AECDATASET(tdata.Dataset):
     def __init__(
             self, spkdata, fltdata):
         super().__init__()
@@ -110,6 +113,45 @@ class aecdataset(tdata.Dataset):
 
     def __len__(self):
         return self.datalen
+
+class AECCDATASET(tdata.Dataset):
+    def __init__(
+            self, dir, 
+            select=[
+                'doubletalk',
+                'doubletalk_with_movement',
+                'farend_singletalk',
+                'nearend_singletalk',
+                'farend_singletalk_with_movement',
+                'sweep'],
+    ):
+        super().__init__()
+        assert os.path.isdir(dir)
+        self.audio_pairs = aecc_audio_pair(dir, os.listdir(dir), select)
+
+    def __getitem__(self, index):
+        audio_pair = self.audio_pairs[index]
+        ref, _ = ta.load(audio_pair[0], normalize=False)
+        rec, _ = ta.load(audio_pair[1], normalize=False)
+        return ref, rec
+
+def aecc_audio_pair(dir, audio_list, select):
+    audio_names = [x.split("_", 1)[0] for x in audio_list]
+    aduio_names = list(set(audio_names))
+    audio_pairs = []
+    for audio_name in audio_names:
+        wavs = glob.glob(os.path.join(dir, f'{audio_name}*.wav'))
+        patterns = ["_".join(os.path.basename(x).split('_')[1:-1]) for x in wavs]
+        patterns = list(set(patterns))
+        for pattern in patterns:
+            if pattern not in select:
+                continue
+            prefix = os.path.join(dir, f"{audio_name}_{pattern}")
+            audio_pair = [f"{prefix}_lpb.wav", f"{prefix}_mic.wav"]
+            # for item in audio_pair:
+            #     assert os.path.isfile(item)
+            audio_pairs.append(audio_pair)
+    return audio_pairs
 
 def pad_tensor(vec, pad, dim):
     """
@@ -174,3 +216,11 @@ class MulPadCollate(object):
 
     def __call__(self, batch):
         return self.pad_collate(batch)
+
+@hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
+def unit_test(cfg: DictConfig):
+    aeccdataset = AECCDATASET(**cfg['data']['aeccdata'])
+    print(f"the length of data is {len(aeccdataset)}")
+
+if __name__ == "__main__":
+    unit_test()
