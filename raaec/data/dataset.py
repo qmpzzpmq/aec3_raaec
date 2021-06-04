@@ -116,7 +116,7 @@ class AECDATASET(tdata.Dataset):
 
 class AECCDATASET(tdata.Dataset):
     def __init__(
-            self, dir, 
+            self, path,
             select=[
                 'doubletalk',
                 'doubletalk_with_movement',
@@ -124,10 +124,13 @@ class AECCDATASET(tdata.Dataset):
                 'nearend_singletalk',
                 'farend_singletalk_with_movement',
                 'sweep'],
+            dump_path=None,
     ):
         super().__init__()
-        assert os.path.isdir(dir)
-        self.audio_pairs = aecc_audio_pair(dir, os.listdir(dir), select)
+        self.audio_pairs = aecc_audio_pair(path, os.listdir(path), select) \
+            if os.path.isdir(path) else self.load(path)
+        if dump_path is not None:
+            self.dump(dump_path)
 
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
@@ -135,23 +138,49 @@ class AECCDATASET(tdata.Dataset):
         rec, _ = ta.load(audio_pair[1], normalize=False)
         return ref, rec
 
-def aecc_audio_pair(dir, audio_list, select):
-    audio_names = [x.split("_", 1)[0] for x in audio_list]
-    aduio_names = list(set(audio_names))
-    audio_pairs = []
-    for audio_name in audio_names:
-        wavs = glob.glob(os.path.join(dir, f'{audio_name}*.wav'))
-        patterns = ["_".join(os.path.basename(x).split('_')[1:-1]) for x in wavs]
-        patterns = list(set(patterns))
-        for pattern in patterns:
-            if pattern not in select:
+    def __len__(self):
+        return len(self.audio_pairs)
+
+    def dump(self, dump_path):
+        with open(dump_path, "w") as fw:
+            for audio_pair in self.audio_pairs:
+                fw.write(f"{audio_pair[0]} {audio_pair[1]}\nvim ")
+
+    def load(self, load_path):
+        logging.warn(f"using {load_path} file directly for aec challenge data")
+        audio_pairs = []
+        for i, line in enumerate(open(load_path, 'r')):
+            audio_pair = line.strip().split(' ')
+            if len(audio_pair) != 2:
+                logging.warn(f"the length data in {i}th line of {load_path} is not 2")
                 continue
-            prefix = os.path.join(dir, f"{audio_name}_{pattern}")
-            audio_pair = [f"{prefix}_lpb.wav", f"{prefix}_mic.wav"]
-            # for item in audio_pair:
-            #     assert os.path.isfile(item)
             audio_pairs.append(audio_pair)
-    return audio_pairs
+        return audio_pairs
+
+def aecc_audio_pair(dir, audio_list, select):
+    audio_items = [x.split("_")[0:-1] for x in audio_list \
+        if os.path.splitext(x)[1] in [".mp3", ",flac", ".wav"]]
+    for i, x in enumerate(audio_items):
+        assert len(x) > 1, f"x: {x}, i: {i}, item: {audio_items[i]}, list: {audio_list[i]}"
+    audio_items = [[x[0], "_".join(x[1:])] for x in audio_items]
+    audio_pairs = {}
+    for audio_item in audio_items:
+        if audio_item[1] not in select:
+            continue
+        if audio_item[0] in audio_pairs:
+            audio_pairs[audio_item[0]].append(audio_item[1])
+        else:
+            audio_pairs[audio_item[0]] = [audio_item[1]]
+    out_pairs = []
+    for k, vs in audio_pairs.items():
+        prefix1 = os.path.join(dir, f"{k}")
+        for v in vs:
+            prefix2 = f"{prefix1}_{v}"
+            out_pair = [f"{prefix2}_lpb.wav", f"{prefix2}_mic.wav"]
+            if not (os.path.isfile(out_pair[0]) and os.path.isfile(out_pair[1])):
+                continue
+            out_pairs.append(out_pair)
+    return out_pairs
 
 def pad_tensor(vec, pad, dim):
     """
@@ -219,8 +248,12 @@ class MulPadCollate(object):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
-    aeccdataset = AECCDATASET(**cfg['data']['aeccdata'])
-    print(f"the length of data is {len(aeccdataset)}")
+    if "aecc" in cfg['data']['trainset']:
+        aeccdataset = AECCDATASET(**cfg['data']['aecc'])
+        print(f"the length of data is {len(aeccdataset)}")
+
+    # if "timit" in cfg['data']['train']:
+    #     timit = TIMITDATASET()
 
 if __name__ == "__main__":
     unit_test()
