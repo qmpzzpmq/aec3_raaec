@@ -249,14 +249,14 @@ class MulPadCollate(object):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
-    if "aecc" in cfg['data']['trainset']:
-        aeccdataset = AECCDATASET(**cfg['data']['aecc'])
+    if "aecc" in cfg['data']['dataset']['trainset']:
+        aeccdataset = AECCDATASET(**cfg['data']['dataset']['aecc'])
         print(f"the length of aecc data is {len(aeccdataset)}")
 
-    if "timitfilter" in cfg['data']['trainset']:
-        filterdataset = WAVDIRDATASET(**cfg['data']['timitfilter']['filter'])
+    if "timitfilter" in cfg['data']['dataset']['trainset']:
+        filterdataset = WAVDIRDATASET(**cfg['data']['dataset']['timitfilter']['filter'])
         print(f"the length of filter data is {len(filterdataset)}")
-        timitdataset = TIMITDATASET(**cfg['data']['timitfilter']['timit'])
+        timitdataset = TIMITDATASET(**cfg['data']['dataset']['timitfilter']['timit'])
         print(f"the length of timit data is {len(timitdataset)}")
         timit_filter_dataset = TIMIT_FLTER_AECDATASET(timitdataset, filterdataset)
         print(f"the length of timit_filter data is {len(timit_filter_dataset)}")
