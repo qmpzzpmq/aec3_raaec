@@ -1,13 +1,16 @@
+import os
 import logging
 
+from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
 import torch.utils.data as tdata
 
 import raaec.data.dataset as dataset
 from raaec.data.dataset import MulPadCollate
 from raaec.data.dataset import SinglePadCollate
+from raaec.data.dataset import AECCDATASET
 
-
+from raaec.utils.set_config import hydra_runner
 class TrainDataModule(pl.LightningDataModule):
     def __init__(
             self, ref_dir, flt_dir, fs, batch_size, train_shuffle, val_shuffle,
@@ -130,3 +133,15 @@ class PretrainDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=self.collect_fn)
         return val_dataloader
+
+@hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
+def unit_test(cfg: DictConfig):
+    if "aecc" in cfg['data']['trainset']:
+        aeccdataset = AECCDATASET(**cfg['data']['aecc'])
+        print(f"the length of data is {len(aeccdataset)}")
+
+    # if "timit" in cfg['data']['train']:
+    #     timit = TIMITDATASET()
+
+if __name__ == "__main__":
+    unit_test()

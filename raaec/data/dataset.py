@@ -52,7 +52,7 @@ class WAVDIRDATASET(tdata.Dataset):
 
 class TIMITDATASET(tdata.Dataset):
     def __init__(
-            self, subset, dirpath, fs, wav_norm=False):
+            self, dirpath, subset, fs=16000, wav_norm=False):
         super().__init__()
         assert os.path.isdir(dirpath)
         self.audiolist = list()
@@ -81,7 +81,7 @@ class TIMITDATASET(tdata.Dataset):
     def __len__(self):
         return self.num_wav
 
-class AECDATASET(tdata.Dataset):
+class TIMIT_FLTER_AECDATASET(tdata.Dataset):
     def __init__(
             self, spkdata, fltdata):
         super().__init__()
@@ -124,6 +124,7 @@ class AECCDATASET(tdata.Dataset):
                 'nearend_singletalk',
                 'farend_singletalk_with_movement',
                 'sweep'],
+            fs=16000,
             dump_path=None,
     ):
         super().__init__()
@@ -250,10 +251,16 @@ class MulPadCollate(object):
 def unit_test(cfg: DictConfig):
     if "aecc" in cfg['data']['trainset']:
         aeccdataset = AECCDATASET(**cfg['data']['aecc'])
-        print(f"the length of data is {len(aeccdataset)}")
+        print(f"the length of aecc data is {len(aeccdataset)}")
 
-    # if "timit" in cfg['data']['train']:
-    #     timit = TIMITDATASET()
+    if "timitfilter" in cfg['data']['trainset']:
+        filterdataset = WAVDIRDATASET(**cfg['data']['timitfilter']['filter'])
+        print(f"the length of filter data is {len(filterdataset)}")
+        timitdataset = TIMITDATASET(**cfg['data']['timitfilter']['timit'])
+        print(f"the length of timit data is {len(timitdataset)}")
+        timit_filter_dataset = TIMIT_FLTER_AECDATASET(timitdataset, filterdataset)
+        print(f"the length of timit_filter data is {len(timit_filter_dataset)}")
+
 
 if __name__ == "__main__":
     unit_test()
