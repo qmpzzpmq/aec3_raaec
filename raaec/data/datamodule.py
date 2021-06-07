@@ -52,13 +52,15 @@ class TrainDataModule(pl.LightningDataModule):
             self.dataset, **self.data_loader_setting,
              collate_fn=self.train_collect_fn)
 
+def init_datamodule(data_conf):
+    return TrainDataModule(data_conf['dataset'], data_conf['data_loader'])
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
-    dm = TrainDataModule(cfg['data']['dataset'], cfg['data']['data_loader'])
-    dm.setup()
-    train_dataloader = dm.train_dataloader()
-    print(f"len of the dataloader {len(train_dataloader)}")
+    dm = init_datamodule(cfg['data'])
+    # dm.setup('train')
+    # train_dataloader = dm.train_dataloader()
+    # print(f"len of the dataloader {len(train_dataloader)}")
 
 if __name__ == "__main__":
     unit_test()
