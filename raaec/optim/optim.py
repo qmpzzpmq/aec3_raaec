@@ -6,15 +6,16 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 import pytorch_lightning as pl
 
-from raaec.model.mobilenet import init_model
+from raaec.module.aec_module import init_module
 from raaec.utils.set_config import hydra_runner
 
 class RAAEC(pl.LightningModule):
-    def __init__(self, raaec_model, opt, scheduler=None):
+    def __init__(self, module_conf, opt_conf):
         super().__init__()
-        self.raaec_model = raaec_model
-        self.opt = opt
-        self.scheduler = scheduler
+        self.raaec_model = init_module(module_conf)
+        self.opt = init_optim(self.raaec_model, opt_conf)
+        self.scheduler = init_scheduler(self.opt, opt_conf)
+        self.save_hyperparameters()
 
     def training_step(self, *args, **kwargs):
         return super().training_step(*args, **kwargs)
@@ -53,11 +54,8 @@ def init_scheduler(optim, scheduler_conf):
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
-    raaec_model = init_model()
-    optim = init_optim(raaec_model, cfg['optim'])
-    scheduler = init_scheduler(optim, cfg['optim'])
-    raaec = RAAEC(raaec_model, optim, scheduler)
-    print(f"raaec{}")
+    raaec = RAAEC(cfg['module'], cfg['optim'])
+    print(f"raaec: {raaec}")
 
 if __name__ == "__main__":
     unit_test()
