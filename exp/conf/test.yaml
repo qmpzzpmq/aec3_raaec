@@ -4,6 +4,15 @@ base:
     tensorboard: 'tensorboard'
     wandb: 'wandb'
 
+module:
+    module_select: "mobilenet"
+    module_conf:
+        frontend_conf:
+            n_fft: 512
+            hop_length: 400
+        af_conf:
+            fs: 16000
+
 optim:
     optim_select: "adam" # 'adam' 'sgd'
     optim_conf:
@@ -56,6 +65,6 @@ loggers:
     tensorboard_conf:
         'save_dir': '${base.tensorboard}/${name}'
     wandb: true
-    wavdb_conf:
+    wandb_conf:
         name: ${name}
         save_dir: '${base.wandb}'

@@ -57,6 +57,7 @@ def unit_test(cfg: DictConfig):
     optim = init_optim(raaec_model, cfg['optim'])
     scheduler = init_scheduler(optim, cfg['optim'])
     raaec = RAAEC(raaec_model, optim, scheduler)
+    print(f"raaec{}")
 
 if __name__ == "__main__":
     unit_test()

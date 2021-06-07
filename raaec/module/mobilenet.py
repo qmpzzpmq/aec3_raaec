@@ -78,7 +78,7 @@ class MASKS_DEC(nn.Module):
     def forward(self, x):
         h1 = self.main(x)
         h2 = self.linear(h1.transpose(1, 3)).transpose(1, 3)
-        return F.sigmoid(h2), h2
+        return torch.sigmoid(h2), h2
 
 class DTD_DEC(nn.Module):
     def __init__(self):
@@ -88,15 +88,15 @@ class DTD_DEC(nn.Module):
     def forward(self, x, condition):
         h = self.enc(x)
         out = self.dec(torch.cat((h, condition), dim=1).transpose(1,3)).transpose(1,3)
-        return F.softmax(out)
+        return F.softmax(out, dim=3)
 
 class RAAEC_MODEL(nn.Module):
     def __init__(
-            self, frontend, af,
+            self, frontend_conf, af_conf,
         ) -> None:
         super().__init__()
-        self.frontend = frontend
-        self.af = af
+        self.frontend = Frontend(**frontend_conf)
+        self.af = AEC3(**af_conf)
         enc_channels = [32, 64, 64, 128, 128]
         enc_strides = [2, 1, 2, 1]
         assert len(enc_channels) - 1 == len(enc_strides)
@@ -122,16 +122,10 @@ class RAAEC_MODEL(nn.Module):
         DTD = self.DTD_dec(h, condition)
         return masks, DTD
 
-def init_model(n_fft=512, hop_length=400, fs=16000):
-    return RAAEC_MODEL(
-        frontend=Frontend(n_fft=n_fft, hop_length=hop_length),
-        af=AEC3(fs=fs, pure_linear=True),
-    )
-
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
-    raaec = init_model(n_fft=512, hop_length=400, fs=16000)
+    raaec = RAAEC_MODEL(**cfg['module']['module_conf'])
     raaec.train()
     ref, _ = ta.load('ref.wav', normalize=False)
     rec, _ = ta.load('ref.wav', normalize=False)

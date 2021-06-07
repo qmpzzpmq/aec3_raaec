@@ -33,7 +33,8 @@ def init_callbacks(callbacks_conf):
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
-    init_callbacks(cfg['callbacks'])
+    callbacks = init_callbacks(cfg['callbacks'])
+    print(f"callbacks: {callbacks}")
 
 if __name__ == "__main__":
     unit_test()
