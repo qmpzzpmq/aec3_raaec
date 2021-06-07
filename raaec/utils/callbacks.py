@@ -25,8 +25,23 @@ def init_callbacks(callbacks_conf):
     
     if callbacks_conf.get("earlystopping", False):
         callbacks.append(
-            pl_callbacks.early_stopping.EarlyStopping(**callbacks_conf['earlystopping_conf'])
+            pl_callbacks.early_stopping.EarlyStopping(
+                **callbacks_conf['earlystopping_conf']
+            )
         )
+
+    if callbacks_conf.get('gpu_stats', False):
+        callbacks.append(
+            pl_callbacks.gpu_stats_monitor.GPUStatsMonitor(
+                **callbacks_conf['gpu_stats_conf']
+            )
+        )
+    if callbacks_conf.get('lr_monitor', False):
+        callbacks.append(
+            pl_callbacks.lr_monitor.LearningRateMonitor(
+                **callbacks_conf['lr_monitor_conf']
+            )
+        ) 
 
     return callbacks
 
