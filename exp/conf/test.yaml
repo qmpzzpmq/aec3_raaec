@@ -1,0 +1,61 @@
+name: "Test"
+base:
+    exp: 'exp'
+    tensorboard: 'tensorboard'
+    wandb: 'wandb'
+
+optim:
+    optim_select: "adam" # 'adam' 'sgd'
+    optim_conf:
+        lr: 0.001
+    sheduler_select: "lambdaLR"
+    scheduler_conf:
+        
+
+data:
+    data_loader:
+        batch_size: 16
+        shuffle: True
+        num_workers: 0
+    dataset:
+        trainset: 
+        - "aecc"
+        # - "timitfilter"
+
+        aecc:
+            path: "/data1/tanghaoyu/AEC-Challenge/datasets/real" 
+            dump_path: "aecc.list"
+        timitfilter:
+            timit:
+                dirpath: "/data1/tanghaoyu/data/TIMIT/TIMIT"
+                subset: "train"
+            filter:
+                datain: "/data1/tanghaoyu/data/rirs_noises/RIRS_NOISES/real_rirs_isotropic_noises"
+
+callbacks:
+    progressbar: true
+    progressbar_conf:
+        refresh_rate: 1
+        process_position: 0
+    modelcheckpoint: true
+    modelcheckpoint_conf:
+        filename: 'epoch{epoch}-val_loss{val_loss:.2f}' 
+        monitor: 'val_loss'
+        save_last: true
+        save_top_k: 5
+        dirpath: '${base.exp}/${name}'
+    earlystopping: true
+    earlystopping_conf:
+        monitor: 'val_loss'
+        mode: 'max'
+        min_delta: 0.001
+        patience: 5
+
+loggers:
+    tensorboard: true
+    tensorboard_conf:
+        'save_dir': '${base.tensorboard}/${name}'
+    wandb: true
+    wavdb_conf:
+        name: ${name}
+        save_dir: '${base.wandb}'
