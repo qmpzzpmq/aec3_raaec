@@ -8,9 +8,9 @@ optim:
     optim_select: "adam" # 'adam' 'sgd'
     optim_conf:
         lr: 0.001
-    sheduler_select: "lambdaLR"
+    scheduler_select: "lambdalr"
     scheduler_conf:
-        
+       last_epoch: -1 
 
 data:
     data_loader:

@@ -1,4 +1,5 @@
 import os
+import logging
 
 from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
@@ -16,7 +17,6 @@ def init_callbacks(callbacks_conf):
         )
 
     if callbacks_conf.get("modelcheckpoint", False):
-        print(f"model check point config {callbacks_conf['modelcheckpoint_conf']}")
         callbacks.append(
             pl_callbacks.model_checkpoint.ModelCheckpoint(
                 **callbacks_conf['modelcheckpoint_conf']
@@ -32,7 +32,7 @@ def init_callbacks(callbacks_conf):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
-    print(f"config: {cfg}")
+    logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     init_callbacks(cfg['callbacks'])
 
 if __name__ == "__main__":

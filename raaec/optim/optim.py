@@ -10,10 +10,11 @@ from raaec.model.mobilenet import init_model
 from raaec.utils.set_config import hydra_runner
 
 class RAAEC(pl.LightningModule):
-    def __init__(self, raaec_model, opt,):
+    def __init__(self, raaec_model, opt, scheduler=None):
         super().__init__()
         self.raaec_model = raaec_model
         self.opt = opt
+        self.scheduler = scheduler
 
     def training_step(self, *args, **kwargs):
         return super().training_step(*args, **kwargs)
@@ -25,24 +26,37 @@ class RAAEC(pl.LightningModule):
         return super().test_step(*args, **kwargs)
 
     def configure_optimizers(self):
-        return self.opt
+        return self.opt, self.scheduler
 
 def init_optim(model, optim_conf):
-    optim_policy = optim_conf.get('opt_policy', "adam")
-    logging.warning(f"using {optim_policy} builder")
-    if optim_policy == "sgd":
+    optim_select = optim_conf.get('optim_select', "adam")
+    logging.warning(f"using {optim_select} builder")
+    if optim_select == "sgd":
         return torch.optim.SGD(model.parameters(), **optim_conf['optim_conf'])
-    elif optim_policy == "adam":
+    elif optim_select == "adam":
         return torch.optim.Adam(model.parameters(), **optim_conf['optim_conf'])
     else:
-        raise NotImplementedError(f"the optim policy {optim_policy}")
+        raise NotImplementedError(f"the optim policy {optim_select}")
+
+def init_scheduler(optim, scheduler_conf):
+    scheduler_select = scheduler_conf.get('scheduler_select', "lambdalr")
+    if scheduler_select == "lambdalr":
+        lr_lambda = lambda epoch: 0.95 ** epoch
+        return torch.optim.lr_scheduler.LambdaLR(
+            optim,
+            lr_lambda=lr_lambda,
+            **scheduler_conf['scheduler_conf']
+        )
+    else:
+        raise NotImplementedError(f"the scheduler policy {scheduler_select}")  
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     raaec_model = init_model()
-    optim = init_optim(raaec_model, cfg.optim)
-    raaec = RAAEC(raaec_model, optim)
+    optim = init_optim(raaec_model, cfg['optim'])
+    scheduler = init_scheduler(optim, cfg['optim'])
+    raaec = RAAEC(raaec_model, optim, scheduler)
 
 if __name__ == "__main__":
     unit_test()
