@@ -58,6 +58,7 @@ def init_datamodule(data_conf):
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     dm = init_datamodule(cfg['data'])
+    print(f"datamodule: {dm}")
     # dm.setup('train')
     # train_dataloader = dm.train_dataloader()
     # print(f"len of the dataloader {len(train_dataloader)}")
