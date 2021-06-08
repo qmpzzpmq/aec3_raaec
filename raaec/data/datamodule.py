@@ -2,18 +2,81 @@ import os
 import logging
 
 from omegaconf import DictConfig, OmegaConf
-import pytorch_lightning as pl
+import torch
 import torch.utils.data as tdata
+import pytorch_lightning as pl
 
 import raaec.data.dataset as dataset
-from raaec.data.dataset import MulPadCollate
-from raaec.data.dataset import SinglePadCollate
 from raaec.data.dataset import AECCDATASET
 from raaec.data.dataset import WAVDIRDATASET
 from raaec.data.dataset import TIMITDATASET
 from raaec.data.dataset import TIMIT_FLTER_AECDATASET
 
 from raaec.utils.set_config import hydra_runner
+
+def pad_tensor(vec, pad, dim):
+    """
+    args:
+        vec - tensor to pad
+        pad - the size to pad to
+        dim - dimension to pad
+
+    return:
+        a new tensor padded to 'pad' in dimension 'dim'
+    """
+    pad_size = list(vec.shape)
+    pad_size[dim] = pad - vec.size(dim)
+    return torch.cat([vec, torch.zeros(*pad_size)], dim=dim)
+
+
+class Pad_tensor(object):
+    def __init__(self, pad, dim):
+        self.pad = pad
+        self.dim = dim
+
+    def __call__(self, vec):
+        return pad_tensor(vec, self.pad, self.dim)
+
+
+class SinglePadCollate(object):
+    def __init__(self, dim=0):
+        self.dim = dim
+
+    def pad_collate(self, batch):
+        # data extract
+        each_data_len = [x.shape[self.dim] for x in batch]
+        max_len = max(each_data_len)
+        padded_each_data = [pad_tensor(x, max_len, self.dim) for x in batch]
+        data = torch.stack(padded_each_data, dim=0)
+        data_len = torch.tensor(each_data_len)
+        return data, data_len
+
+    def __call__(self, batch):
+        return self.pad_collate(batch)
+
+
+class MulPadCollate(object):
+    def __init__(self, pad_choices, dim=0):
+        super().__init__()
+        self.dim = dim
+        self.pad_choices = pad_choices
+
+    def pad_collate(self, batch):
+        # data extract
+        data = list()
+        data_len = list()
+        for i, pad_choice in enumerate(self.pad_choices):
+            if pad_choice:
+                each_data = [x[i] for x in batch]
+                each_data_len = [x.shape[self.dim] for x in each_data]
+                max_len = max(each_data_len)
+                padded_each_data = [pad_tensor(x, max_len, self.dim) for x in each_data]
+                data.append(torch.stack(padded_each_data, dim=0))
+                data_len.append(torch.tensor(each_data_len))
+        return data, data_len
+
+    def __call__(self, batch):
+        return self.pad_collate(batch)
 
 class TrainDataModule(pl.LightningDataModule):
     # only support aecc data right now

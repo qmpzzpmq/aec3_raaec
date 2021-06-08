@@ -1,10 +1,10 @@
 name: "Test"
 
 base:
-    exp: 'exp'
-    tensorboard: 'tensorboard'
-    wandb: 'wandb'
-    neptune: 'neptune'
+    exp: 'test-exp'
+    tensorboard: 'test-tensorboard'
+    wandb: 'test-wandb'
+    neptune: 'test-neptune'
     seed: 777
 
 trainer:
@@ -56,19 +56,11 @@ data:
         shuffle: True
         num_workers: 0
     dataset:
-        trainset: 
-        - "aecc"
-        # - "timitfilter"
-
-        aecc:
-            path: "/data1/tanghaoyu/AEC-Challenge/datasets/real" 
-            dump_path: "aecc.list"
-        timitfilter:
-            timit:
-                dirpath: "/data1/tanghaoyu/data/TIMIT/TIMIT"
-                subset: "train"
-            filter:
-                datain: "/data1/tanghaoyu/data/rirs_noises/RIRS_NOISES/real_rirs_isotropic_noises"
+        train: 
+            - type: "AECC_REAL_DATASET"
+              conf:
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/real"
+                  dump_path: "aecc.list"
 
 callbacks:
     progressbar: true

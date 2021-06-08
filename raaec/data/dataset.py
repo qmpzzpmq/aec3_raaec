@@ -1,6 +1,7 @@
 import os
 import logging
-import glob
+import json
+import importlib
 
 from omegaconf import DictConfig, OmegaConf
 import librosa
@@ -114,21 +115,20 @@ class TIMIT_FLTER_AECDATASET(tdata.Dataset):
     def __len__(self):
         return self.datalen
 
-class AECCDATASET(tdata.Dataset):
+class AECC_REAL_DATASET(tdata.Dataset):
     def __init__(
             self, path,
             select=[
+                'farend_singletalk',
+                'farend_singletalk_with_movement',
                 'doubletalk',
                 'doubletalk_with_movement',
-                'farend_singletalk',
-                'nearend_singletalk',
-                'farend_singletalk_with_movement',
-                'sweep'],
+                ],
             fs=16000,
             dump_path=None,
     ):
         super().__init__()
-        self.audio_pairs = aecc_audio_pair(path, os.listdir(path), select) \
+        self.audio_pairs = self.build(path, os.listdir(path), select) \
             if os.path.isdir(path) else self.load(path)
         if dump_path is not None:
             self.dump(dump_path)
@@ -145,122 +145,69 @@ class AECCDATASET(tdata.Dataset):
     def dump(self, dump_path):
         with open(dump_path, "w") as fw:
             for audio_pair in self.audio_pairs:
-                fw.write(f"{audio_pair[0]} {audio_pair[1]}\nvim ")
+                fw.write(f"{json.dumps(audio_pair)}\n")
 
     def load(self, load_path):
         logging.warn(f"using {load_path} file directly for aec challenge data")
         audio_pairs = []
         for i, line in enumerate(open(load_path, 'r')):
-            audio_pair = line.strip().split(' ')
-            if len(audio_pair) != 2:
-                logging.warn(f"the length data in {i}th line of {load_path} is not 2")
+            audio_pair = json.loads(line.strip())
+            if len(audio_pair) != 3:
+                logging.warn(f"the length data in {i}th line of {load_path} is not 3")
                 continue
             audio_pairs.append(audio_pair)
         return audio_pairs
 
-def aecc_audio_pair(dir, audio_list, select):
-    audio_items = [x.split("_")[0:-1] for x in audio_list \
-        if os.path.splitext(x)[1] in [".mp3", ",flac", ".wav"]]
-    for i, x in enumerate(audio_items):
-        assert len(x) > 1, f"x: {x}, i: {i}, item: {audio_items[i]}, list: {audio_list[i]}"
-    audio_items = [[x[0], "_".join(x[1:])] for x in audio_items]
-    audio_pairs = {}
-    for audio_item in audio_items:
-        if audio_item[1] not in select:
-            continue
-        if audio_item[0] in audio_pairs:
-            audio_pairs[audio_item[0]].append(audio_item[1])
-        else:
-            audio_pairs[audio_item[0]] = [audio_item[1]]
-    out_pairs = []
-    for k, vs in audio_pairs.items():
-        prefix1 = os.path.join(dir, f"{k}")
-        for v in vs:
-            prefix2 = f"{prefix1}_{v}"
-            out_pair = [f"{prefix2}_lpb.wav", f"{prefix2}_mic.wav"]
-            if not (os.path.isfile(out_pair[0]) and os.path.isfile(out_pair[1])):
+    def build(self, dir, audio_list, select):
+        audio_items = [x.split("_")[0:-1] for x in audio_list \
+            if os.path.splitext(x)[1] in [".mp3", ",flac", ".wav"]]
+        for i, x in enumerate(audio_items):
+            assert len(x) > 1, f"x: {x}, i: {i}, item: {audio_items[i]}, list: {audio_list[i]}"
+        audio_items = [[x[0], "_".join(x[1:])] for x in audio_items]
+        audio_pairs = {}
+        for audio_item in audio_items:
+            near_path = os.path.join(dir, f"{audio_item[0]}_nearend_singletalk_mic.wav")
+            if not os.path.isfile(near_path):
                 continue
-            out_pairs.append(out_pair)
-    return out_pairs
+            if audio_item[1] not in select:
+                continue
+            if audio_item[0] in audio_pairs:
+                audio_pairs[audio_item[0]].append(audio_item[1])
+            else:
+                audio_pairs[audio_item[0]] = [audio_item[1]]
+        out_pairs = []
+        for k, vs in audio_pairs.items():
+            prefix1 = os.path.join(dir, f"{k}")
+            for v in vs:
+                prefix2 = f"{prefix1}_{v}"
+                out_pair = {
+                    "ref": f"{prefix2}_lpb.wav",
+                    "rec": f"{prefix2}_mic.wav",
+                    "near": near_path,
+                    }
+                if not (os.path.isfile(out_pair['ref']) and os.path.isfile(out_pair['rec'])):
+                    logging.warning(f"{out_pair['ref']} or {out_pair['rec']} is not exist, skip")
+                    continue
+                out_pairs.append(out_pair)
+        return out_pairs
 
-def pad_tensor(vec, pad, dim):
-    """
-    args:
-        vec - tensor to pad
-        pad - the size to pad to
-        dim - dimension to pad
-
-    return:
-        a new tensor padded to 'pad' in dimension 'dim'
-    """
-    pad_size = list(vec.shape)
-    pad_size[dim] = pad - vec.size(dim)
-    return torch.cat([vec, torch.zeros(*pad_size)], dim=dim)
-
-
-class Pad_tensor(object):
-    def __init__(self, pad, dim):
-        self.pad = pad
-        self.dim = dim
-
-    def __call__(self, vec):
-        return pad_tensor(vec, self.pad, self.dim)
-
-
-class SinglePadCollate(object):
-    def __init__(self, dim=0):
-        self.dim = dim
-
-    def pad_collate(self, batch):
-        # data extract
-        each_data_len = [x.shape[self.dim] for x in batch]
-        max_len = max(each_data_len)
-        padded_each_data = [pad_tensor(x, max_len, self.dim) for x in batch]
-        data = torch.stack(padded_each_data, dim=0)
-        data_len = torch.tensor(each_data_len)
-        return data, data_len
-
-    def __call__(self, batch):
-        return self.pad_collate(batch)
-
-
-class MulPadCollate(object):
-    def __init__(self, pad_choices, dim=0):
-        super().__init__()
-        self.dim = dim
-        self.pad_choices = pad_choices
-
-    def pad_collate(self, batch):
-        # data extract
-        data = list()
-        data_len = list()
-        for i, pad_choice in enumerate(self.pad_choices):
-            if pad_choice:
-                each_data = [x[i] for x in batch]
-                each_data_len = [x.shape[self.dim] for x in each_data]
-                max_len = max(each_data_len)
-                padded_each_data = [pad_tensor(x, max_len, self.dim) for x in each_data]
-                data.append(torch.stack(padded_each_data, dim=0))
-                data_len.append(torch.tensor(each_data_len))
-        return data, data_len
-
-    def __call__(self, batch):
-        return self.pad_collate(batch)
+# class AECC_SYNTHETIC_DATASET(tdata.dataset):
+#     def __init__(self, csv_path):
+#         super().__init__()
+#         assert os.path.isfile(csv_path)
+#         base_dir = os.path.dirname(csv_path)
+# 
+# 
+#     def load(self, csv_path, base_dir):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
-    if "aecc" in cfg['data']['dataset']['trainset']:
-        aeccdataset = AECCDATASET(**cfg['data']['dataset']['aecc'])
-        print(f"the length of aecc data is {len(aeccdataset)}")
-
-    if "timitfilter" in cfg['data']['dataset']['trainset']:
-        filterdataset = WAVDIRDATASET(**cfg['data']['dataset']['timitfilter']['filter'])
-        print(f"the length of filter data is {len(filterdataset)}")
-        timitdataset = TIMITDATASET(**cfg['data']['dataset']['timitfilter']['timit'])
-        print(f"the length of timit data is {len(timitdataset)}")
-        timit_filter_dataset = TIMIT_FLTER_AECDATASET(timitdataset, filterdataset)
-        print(f"the length of timit_filter data is {len(timit_filter_dataset)}")
-
+    train_datasets = []
+    for dataset in cfg['data']['dataset']['train']:
+        dataset_class = eval(f"{dataset['type']}")
+        train_datasets.append(
+            dataset_class(**dataset['conf'])
+        )
 
 if __name__ == "__main__":
     unit_test()
