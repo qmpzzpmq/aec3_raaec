@@ -1,7 +1,6 @@
 import os
 import logging
 import json
-import importlib
 
 from omegaconf import DictConfig, OmegaConf
 import librosa
@@ -135,9 +134,10 @@ class AECC_REAL_DATASET(tdata.Dataset):
 
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
-        ref, _ = ta.load(audio_pair[0], normalize=False)
-        rec, _ = ta.load(audio_pair[1], normalize=False)
-        return ref, rec
+        ref, _ = ta.load(audio_pair['ref'], normalize=False)
+        rec, _ = ta.load(audio_pair['rec'], normalize=False)
+        near, _ = ta.load(audio_pair['rec'], normalize=False)
+        return ref, rec, near
 
     def __len__(self):
         return len(self.audio_pairs)
@@ -202,12 +202,28 @@ class AECC_REAL_DATASET(tdata.Dataset):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
+    logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     train_datasets = []
     for dataset in cfg['data']['dataset']['train']:
-        dataset_class = eval(f"{dataset['type']}")
+        dataset_class = eval(f"{dataset['select']}")
         train_datasets.append(
             dataset_class(**dataset['conf'])
         )
+
+    val_datasets = []
+    for dataset in cfg['data']['dataset']['val']:
+        dataset_class = eval(f"{dataset['select']}")
+        val_datasets.append(
+            dataset_class(**dataset['conf'])
+        )
+
+    test_datasets = []
+    for dataset in cfg['data']['dataset']['test']:
+        dataset_class = eval(f"{dataset['select']}")
+        test_datasets.append(
+            dataset_class(**dataset['conf'])
+        )    
+    
 
 if __name__ == "__main__":
     unit_test()

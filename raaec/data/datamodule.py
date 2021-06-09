@@ -1,16 +1,11 @@
 import os
 import logging
+import importlib
 
 from omegaconf import DictConfig, OmegaConf
 import torch
 import torch.utils.data as tdata
 import pytorch_lightning as pl
-
-import raaec.data.dataset as dataset
-from raaec.data.dataset import AECCDATASET
-from raaec.data.dataset import WAVDIRDATASET
-from raaec.data.dataset import TIMITDATASET
-from raaec.data.dataset import TIMIT_FLTER_AECDATASET
 
 from raaec.utils.set_config import hydra_runner
 
@@ -91,35 +86,64 @@ class TrainDataModule(pl.LightningDataModule):
         return super().prepare_data()
 
     def setup(self, stage=None):
-        datasets = []
-        if stage == "train":
-            if "aecc" in self.data_setting['trainset']:
-                aeccdataset = AECCDATASET(**self.data_setting['aecc'])
-                print(f"the length of aecc data is {len(aeccdataset)}")
-                datasets.append(aeccdataset)
-
-            if "timitfilter" in self.data_setting['trainset']:
-                raise NotImplementedError('have not implemented yet')
-                filterdataset = WAVDIRDATASET(**self.data_setting['timitfilter']['filter'])
-                print(f"the length of filter data is {len(filterdataset)}")
-                timitdataset = TIMITDATASET(**self.data_setting['timitfilter']['timit'])
-                print(f"the length of timit data is {len(timitdataset)}")
-                timit_filter_dataset = TIMIT_FLTER_AECDATASET(timitdataset, filterdataset)
-                print(f"the length of timit_filter data is {len(timit_filter_dataset)}")
-            self.dataset = tdata.ConcatDataset(datasets)
+        if stage in (None, 'fit'):
+            datasets = []
+            for dataset in self.data_setting['train']:
+                dataset_class = importlib.import_module(
+                    f"{dataset['type']}", package='raaec.data.dataset',
+                )
+                datasets.append(
+                    dataset_class(**dataset['conf'])
+                )
+            self.train_dataset = tdata.ConcatDataset(datasets)
             self.train_collect_fn = MulPadCollate(
-                    pad_choices=[True] * 2, dim=0)
+                    pad_choices=[True] * 3, dim=0)
+            
+            datasets = []
+            for dataset in self.data_setting['val']:
+                dataset_class = importlib.import_module(
+                    f"{dataset['select']}", package='raaec.data.dataset',
+                )
+                datasets.append(
+                    dataset_class(**dataset['conf'])
+                )
+            self.val_dataset = tdata.ConcatDataset(datasets)
+            self.val_collect_fn = MulPadCollate(
+                    pad_choices=[True] * 3, dim=0)
+
+        if stage in (None, 'test'):
+            datasets = []
+            for dataset in self.data_setting['test']:
+                dataset_class = eval(f"{dataset['select']}")
+                dataset_class = importlib.import_module(
+                    f"{dataset['select']}", package='raaec.data.dataset',
+                )
+            self.test_dataset = tdata.ConcatDataset(datasets)
+            self.test_collect_fn = MulPadCollate(
+                    pad_choices=[True] * 3, dim=0)
 
     def train_dataloader(self):
         return tdata.DataLoader(
-            self.dataset, **self.data_loader_setting,
-             collate_fn=self.train_collect_fn)
+            self.train_dataset, **self.data_loader_setting,
+            collate_fn=self.train_collect_fn)
+
+    def val_dataloader(self):
+        return tdata.DataLoader(
+            self.val_dataset, **self.data_loader_setting,
+            collate_fn=self.val_collect_fn)
+
+    def test_dataloader(self):
+        return tdata.DataLoader(
+            self.val_dataset, **self.data_loader_setting,
+            collate_fn=self.val_collect_fn)
+    
 
 def init_datamodule(data_conf):
     return TrainDataModule(data_conf['dataset'], data_conf['data_loader'])
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
+    logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     dm = init_datamodule(cfg['data'])
     print(f"datamodule: {dm}")
     # dm.setup('train')

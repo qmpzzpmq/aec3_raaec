@@ -42,6 +42,11 @@ module:
         af_conf:
             fs: 16000
 
+loss:
+    select: "nn.BCEloss"
+    conf:
+        reduction: "none"
+
 optim:
     optim_select: "adam" # 'adam' 'sgd'
     optim_conf:
@@ -52,15 +57,26 @@ optim:
 
 data:
     data_loader:
-        batch_size: 16
+        batch_size: 1
         shuffle: True
         num_workers: 0
     dataset:
         train: 
-            - type: "AECC_REAL_DATASET"
+            - select: "AECC_REAL_DATASET"
               conf:
                   path: "/data1/tanghaoyu/AEC-Challenge/datasets/real"
-                  dump_path: "aecc.list"
+                  dump_path: "train_real.list"
+        val:
+            - select: "AECC_REAL_DATASET"
+              conf:
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/test_set/clean"
+                  dump_path: "val_test_clean.list"
+        test:
+            - select: "AECC_REAL_DATASET"
+              conf:
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/test_set/noisy"
+                  dump_path: "test_test_noisy.list"
+              
 
 callbacks:
     progressbar: true
