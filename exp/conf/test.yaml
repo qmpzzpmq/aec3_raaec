@@ -44,8 +44,6 @@ module:
 
 loss:
     select: "nn.BCEloss"
-    conf:
-        reduction: "none"
 
 optim:
     optim_select: "adam" # 'adam' 'sgd'

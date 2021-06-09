@@ -22,7 +22,7 @@ def init_module(module_conf):
 
 def init_loss(loss_conf):
     loss_class = importlib.import_module(loss_conf['select'], package='torch')
-    return loss_class(**loss_conf['conf'])
+    return loss_class(reduction="sum")
 
 class RAAEC(pl.LightningModule):
     def __init__(self, module_conf, optim_conf=None, loss_conf=None):
@@ -46,7 +46,7 @@ class RAAEC(pl.LightningModule):
             predicts_max_len = max(predicts_max_len, predict.size(0))
         pad_predicts = pad_tensor(predicts, predicts_max_len, 0)
         loss = self.loss(pad_predicts, nears)
-        loss_mean = loss * datas_len[0] # for further dynamic batch size
+        loss_mean = loss / datas_len.sum() # for further dynamic batch size
         self.log(
             'training_loss', loss_mean,
             on_step=True, on_epoch=False, prog_bar=True, logger=True)
