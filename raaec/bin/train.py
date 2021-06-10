@@ -8,7 +8,7 @@ import torch.utils.data as tdata
 
 from raaec.utils.callbacks import init_callbacks
 from raaec.utils.logger import init_loggers
-from raaec.module.aec_module import init_module
+from raaec.module.aec_module import RAAEC
 from raaec.data.datamodule import init_datamodule
 from raaec.utils.set_config import hydra_runner
 
@@ -20,7 +20,7 @@ def main(cfg: DictConfig):
 
     callbacks = init_callbacks(cfg['callbacks'])
     loggers = init_loggers(cfg['loggers'])
-    raaec = init_module(cfg['module'], cfg['optim'], cfg['loss'])
+    raaec = RAAEC(cfg['module'], cfg['optim'], cfg['loss'])
     dm = init_datamodule(cfg['data'])
 
     trainer = pl.Trainer(

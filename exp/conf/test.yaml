@@ -31,19 +31,19 @@ trainer:
     prepare_data_per_node: false 
     precision: 32
     replace_sampler_ddp: true
-    resume_from_checkpoint: ???
+    resume_from_checkpoint: null
 
 module:
     module_select: "mobilenet"
     module_conf:
-        frontend_conf:
-            n_fft: 512
-            hop_length: 400
         af_conf:
             fs: 16000
+    frontend_conf:
+        n_fft: 512
+        hop_length: 400
 
 loss:
-    select: "nn.BCEloss"
+    select: "nn.BCELoss"
 
 optim:
     optim_select: "adam" # 'adam' 'sgd'
@@ -67,12 +67,12 @@ data:
         val:
             - select: "AECC_REAL_DATASET"
               conf:
-                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/test_set/clean"
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/clean"
                   dump_path: "val_test_clean.list"
         test:
             - select: "AECC_REAL_DATASET"
               conf:
-                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/test_set/noisy"
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/noisy"
                   dump_path: "test_test_noisy.list"
               
 
@@ -111,8 +111,9 @@ loggers:
         name: ${name}
         save_dir: '${base.wandb}'
         log_model: true
-    neptune: true
+    neptune: false
     neptune_conf:
         project_name: '${base.neptune}'
         experiment_name: '${name}'
+        api_token: 'ANONYMOUS'
          

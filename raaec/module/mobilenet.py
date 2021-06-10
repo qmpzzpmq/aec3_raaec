@@ -2,29 +2,16 @@ import logging
 import os
 from typing import Any, Callable, Optional
 
-import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
 import torchaudio as ta
 
-from raaec.DSP.torch_DSP import lengths_sub
 from raaec.DSP.torch_DSP import common_normalize
 from raaec.utils.set_config import hydra_runner
 from raaec.aec3.webrtc_aec3 import AEC3
 
-
-class Frontend(nn.Module):
-    def __init__(self, n_fft=512, hop_length=400):
-        super().__init__()
-        self.fft = ta.transforms.Spectrogram(n_fft=n_fft, hop_length=hop_length, power=1)
-
-    def forward(self, est, ref):
-        est_energy = self.fft(est)
-        ref_energy = self.fft(ref)
-        return torch.cat([est_energy, ref_energy], dim=-1).log10()
 
 class ConvBNReLU(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, groups=1, norm_layer=None):
@@ -92,10 +79,9 @@ class DTD_DEC(nn.Module):
 
 class RAAEC_MODEL(nn.Module):
     def __init__(
-            self, frontend_conf, af_conf,
+            self, af_conf,
         ) -> None:
         super().__init__()
-        self.frontend = Frontend(**frontend_conf)
         self.af = AEC3(**af_conf)
         enc_channels = [32, 64, 64, 128, 128]
         enc_strides = [2, 1, 2, 1]
@@ -111,7 +97,9 @@ class RAAEC_MODEL(nn.Module):
         self.DTD_dec = DTD_DEC()
 
     def forward(self, ref, rec):
-        est, _, = self.af.linear_run(ref.numpy(), rec.numpy())
+        est, _, = self.af.linear_run(
+            ref.cpu().numpy(), rec.cpu().numpy()
+        )
         est = torch.as_tensor(est, dtype=torch.float, device=ref.device)
         est, ref = common_normalize([est, ref])
         x = self.frontend(est, ref)

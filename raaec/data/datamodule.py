@@ -8,6 +8,7 @@ import torch.utils.data as tdata
 import pytorch_lightning as pl
 
 from raaec.utils.set_config import hydra_runner
+import raaec.data.dataset as local_dataset
 
 def pad_tensor(vec, pad, dim):
     """
@@ -21,8 +22,19 @@ def pad_tensor(vec, pad, dim):
     """
     pad_size = list(vec.shape)
     pad_size[dim] = pad - vec.size(dim)
-    return torch.cat([vec, torch.zeros(*pad_size)], dim=dim)
+    return torch.cat(
+        [vec, torch.zeros(
+            *pad_size, dtype=vec.dtype, device=vec.device)]
+        , dim=dim
+    )
 
+def singlepadcollate(batch, dim=-1):
+    each_data_len = [x.shape[dim] for x in batch]
+    max_len = max(each_data_len)
+    padded_each_data = [pad_tensor(x, max_len, dim) for x in batch]
+    data = torch.stack(padded_each_data, dim=0)
+    data_len = torch.tensor(each_data_len)
+    return data, data_len
 
 class Pad_tensor(object):
     def __init__(self, pad, dim):
@@ -89,9 +101,7 @@ class TrainDataModule(pl.LightningDataModule):
         if stage in (None, 'fit'):
             datasets = []
             for dataset in self.data_setting['train']:
-                dataset_class = importlib.import_module(
-                    f"{dataset['type']}", package='raaec.data.dataset',
-                )
+                dataset_class = getattr(local_dataset, dataset['select'])
                 datasets.append(
                     dataset_class(**dataset['conf'])
                 )
@@ -101,9 +111,7 @@ class TrainDataModule(pl.LightningDataModule):
             
             datasets = []
             for dataset in self.data_setting['val']:
-                dataset_class = importlib.import_module(
-                    f"{dataset['select']}", package='raaec.data.dataset',
-                )
+                dataset_class = getattr(local_dataset, dataset['select'])
                 datasets.append(
                     dataset_class(**dataset['conf'])
                 )
@@ -114,9 +122,9 @@ class TrainDataModule(pl.LightningDataModule):
         if stage in (None, 'test'):
             datasets = []
             for dataset in self.data_setting['test']:
-                dataset_class = eval(f"{dataset['select']}")
-                dataset_class = importlib.import_module(
-                    f"{dataset['select']}", package='raaec.data.dataset',
+                dataset_class = getattr(local_dataset, dataset['select'])
+                datasets.append(
+                    dataset_class(**dataset['conf'])
                 )
             self.test_dataset = tdata.ConcatDataset(datasets)
             self.test_collect_fn = MulPadCollate(

@@ -95,7 +95,8 @@ def common_normalize(signals, ceil=1.0, dim=-1):
     amplitude_factor = max(max_amplitude)
     return [
         torch.index_select(
-            x, dim, torch.tensor(range(0, min_len))) / amplitude_factor for x in signals]
+            x, dim, torch.tensor(range(0, min_len), device=x.device))
+        / amplitude_factor for x in signals]
 
 def DTD_compute(ref_power, rec_power, threshold=0.001):
     max_ref = ref_power.max(dim=-1)
