@@ -61,7 +61,6 @@ class SinglePadCollate(object):
     def __call__(self, batch):
         return self.pad_collate(batch)
 
-
 class MulPadCollate(object):
     def __init__(self, pad_choices, dim=0):
         super().__init__()

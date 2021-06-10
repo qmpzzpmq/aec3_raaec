@@ -1,37 +1,31 @@
 import logging
 import os
 from typing import Any, Callable, Optional
-import importlib
 
 import torch.nn as nn
 from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
 
-from raaec.module.mobilenet import RAAEC_MODEL
-from raaec.module.frontend import FRONTEND
+from raaec.module.mobilenet import AEC_MOBILENET
+from raaec.module.loss import init_loss
 from raaec.optim.optim import init_optim
 from raaec.optim.optim import init_scheduler
 from raaec.data.datamodule import singlepadcollate
 from raaec.utils.set_config import hydra_runner
 
 def init_module(module_conf):
-    module_select = module_conf.get('module_select', "mobilenet")
+    module_select = module_conf.get('select', "mobilenet")
     if module_select == 'mobilenet':
-        return RAAEC_MODEL(**module_conf['module_conf'])
+        return AEC_MOBILENET(**module_conf['module_conf'])
     else:
         raise NotImplementedError(f"{module_select} haven't been implemented")
 
-def init_loss(loss_conf):
-    loss_class = eval(loss_conf['select'])
-    return loss_class(reduction="sum")
-
 class RAAEC(pl.LightningModule):
-    def __init__(self, module_conf, frontend_conf, optim_conf=None, loss_conf=None):
+    def __init__(self, module_conf, optim_conf=None, loss_conf=None):
         super().__init__()
-        self.frontend = FRONTEND(**frontend_conf)
-        self.raaec_model = init_module(module_conf)
+        self.raaec = init_module(module_conf)
         if optim_conf is not None:
-            self.optim = init_optim(self.raaec_model, optim_conf)
+            self.optim = init_optim(self.raaec, optim_conf)
             self.scheduler = init_scheduler(self.optim, optim_conf)
         if loss_conf is not None:
             self.loss = init_loss(loss_conf)
@@ -39,32 +33,43 @@ class RAAEC(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
-        self.log(
-            'training_loss', loss,
-            on_step=True, on_epoch=False, prog_bar=True, logger=True)
+        for k, v in loss.items():
+            self.log(
+                f"train_{k}", v, on_step=True, on_epoch=False, 
+                prog_bar=True, logger=True,
+            )
+            loss['f"train_{k}"'] = loss.pop(k)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss = self.loss_compute(batch)
+        for k, v in loss.items():
+            self.log(
+                f"val_{k}", v, on_step=True, on_epoch=True, 
+                prog_bar=True, logger=True,
+            )
+            loss['f"train_{k}"'] = loss.pop(k)
         return loss
 
     def loss_compute(self, batch):
         datas, datas_len = batch
         refs, recs, nears = datas
-        predicts = []
-        predicts_max_len = 0
-        for ref, rec in zip(refs, recs):
-            predict = self.raaec_model(ref.squeeze(), rec.squeeze())
-            predicts.append(predict)
-            predicts_max_len = max(predicts_max_len, predict.size(0))
-        pad_predicts, predicts_len = singlepadcollate(predicts)
-        loss = self.loss(pad_predicts, nears)
-        loss_mean = loss / predicts_len.sum() # for further dynamic batch size
-        return loss_mean
 
-    def validation_step(self, batch, batch_idx):
-        loss = self.loss_compute(batch, batch_idx)
-        self.log(
-            'training_loss', loss,
-            on_step=True, on_epoch=False, prog_bar=True, logger=True
+        predict_masks = []
+        predict_DTDs = []
+        for ref, rec, near in zip(refs, recs, nears):
+            predict_mask, predict_DTD, est_power, ref_power = self.raaec(
+                ref.squeeze(), rec.squeeze())
+            predict_masks.append(predict_mask)
+            predict_DTDs.append(predict_DTD)
+        pad_predict_masks, masks_len = singlepadcollate(predict_masks)
+        pad_predict_DTDs, DTDs_len = singlepadcollate(predict_DTDs)
+
+        recs_power, nears_power = self.raaec.frontend([recs, nears])
+        return self.loss(
+            pad_predict_DTDs, pad_predict_masks, recs_power, nears_power, masks_len.sum()
         )
-        return loss
+
     # def test_step(self, *args, **kwargs):
     #     return super().test_step(*args, **kwargs)
 

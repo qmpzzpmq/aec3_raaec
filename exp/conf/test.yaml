@@ -34,16 +34,26 @@ trainer:
     resume_from_checkpoint: null
 
 module:
-    module_select: "mobilenet"
+    select: "mobilenet"
     module_conf:
         af_conf:
             fs: 16000
-    frontend_conf:
-        n_fft: 512
-        hop_length: 400
+        frontend_conf:
+            agc:
+                select: 'FIXGAIN'
+                agc_conf:
+                    gain_index: 32768
+            fft:
+                fft_conf:
+                    n_fft: 512
+                    hop_length: 400
 
 loss:
-    select: "nn.BCELoss"
+    select: "MASK_DTD_LOSS"
+    loss_conf:
+        criterion_DTD: "nn.CrossEntropyLoss"
+        criterion_mask: "nn.BCELoss"
+        DTDweight: 0.3
 
 optim:
     optim_select: "adam" # 'adam' 'sgd'
@@ -103,10 +113,10 @@ callbacks:
         logging_interval: 'epoch'
 
 loggers:
-    tensorboard: true
+    tensorboard: false
     tensorboard_conf:
         'save_dir': '${base.tensorboard}/${name}'
-    wandb: true
+    wandb: false
     wandb_conf:
         name: ${name}
         save_dir: '${base.wandb}'

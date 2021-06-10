@@ -98,10 +98,12 @@ def common_normalize(signals, ceil=1.0, dim=-1):
             x, dim, torch.tensor(range(0, min_len), device=x.device))
         / amplitude_factor for x in signals]
 
-def DTD_compute(ref_power, rec_power, threshold=0.001):
-    max_ref = ref_power.max(dim=-1)
-    max_rec = rec_power.max(dim=-1)
-    dtd = torch.ones_like(max_ref, dtype=torch.int) * 2
-    dtd[torch.logical_and(max_ref<threshold, max_rec>threshold)] = 0
-    dtd[torch.logical_and(max_ref>threshold, max_rec<threshold)] = 0
+def DTD_compute(rec_power, near_power,threshold=0.001):
+    max_rec, _ = rec_power.max(dim=-1)
+    max_near, _ = near_power.max(dim=-1)
+    dtd = torch.ones_like(
+        max_near, dtype=torch.int, device=rec_power.device
+    ) * 2
+    dtd[torch.logical_and(max_rec<threshold, max_near>threshold)] = 0
+    dtd[torch.logical_and(max_rec>threshold, max_near<threshold)] = 1
     return dtd

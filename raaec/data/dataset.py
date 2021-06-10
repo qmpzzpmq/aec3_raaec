@@ -137,7 +137,7 @@ class AECC_REAL_DATASET(tdata.Dataset):
         ref, _ = ta.load(audio_pair['ref'], normalize=False)
         rec, _ = ta.load(audio_pair['rec'], normalize=False)
         near, _ = ta.load(audio_pair['rec'], normalize=False)
-        return ref, rec, near
+        return ref.squeeze(0), rec.squeeze(0), near.squeeze(0)
 
     def __len__(self):
         return len(self.audio_pairs)
