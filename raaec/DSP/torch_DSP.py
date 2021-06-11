@@ -74,17 +74,14 @@ def batch_spec_gain(src, gain):
         torch.diag_embed(gain), src.reshape(b, -1)).reshape(b, t, f)
     return src
 
-def lengths_sub(x, y, dim=-1):
-    len_x = x.size(dim)
-    len_y = y.size(dim)
-    if len_x == len_y:
-        return x, y
-    if len_x < len_y:
-        y_sub, _ = torch.split(y, len_x)
-        return x, y_sub
-    else:
-        x_sub, _ = torch.split(x, len_y)
-        return x_sub, y
+def lengths_sub(signals, dim=-1):
+    lens = []
+    for signal in signals:
+        lens.append(signal.size(dim))
+    min_len = min(lens)
+    return [torch.index_select(
+            x, dim, torch.tensor(range(0, min_len), device=x.device)) 
+        for x in signals]
 
 def common_normalize(signals, ceil=1.0, dim=-1):
     max_amplitude = []

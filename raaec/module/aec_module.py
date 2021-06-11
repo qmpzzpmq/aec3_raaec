@@ -33,23 +33,24 @@ class RAAEC(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
+        rename_loss = {}
         for k, v in loss.items():
             self.log(
                 f"train_{k}", v, on_step=True, on_epoch=False, 
                 prog_bar=True, logger=True,
             )
-            loss['f"train_{k}"'] = loss.pop(k)
-        return loss
+            rename_loss[f"train_{k}"] = loss[k]
+        return loss['loss']
 
     def validation_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
+        rename_loss = {}
         for k, v in loss.items():
             self.log(
                 f"val_{k}", v, on_step=True, on_epoch=True, 
                 prog_bar=True, logger=True,
             )
-            loss['f"train_{k}"'] = loss.pop(k)
-        return loss
+            rename_loss[f"train_{k}"] = loss[k]
 
     def loss_compute(self, batch):
         datas, datas_len = batch
@@ -57,17 +58,24 @@ class RAAEC(pl.LightningModule):
 
         predict_masks = []
         predict_DTDs = []
-        for ref, rec, near in zip(refs, recs, nears):
+        ests_power = []
+        refs_power = []
+        for ref, rec in zip(refs, recs):
             predict_mask, predict_DTD, est_power, ref_power = self.raaec(
                 ref.squeeze(), rec.squeeze())
             predict_masks.append(predict_mask)
             predict_DTDs.append(predict_DTD)
+            ests_power.append(est_power)
+            refs_power.append(ref_power)
         pad_predict_masks, masks_len = singlepadcollate(predict_masks)
         pad_predict_DTDs, DTDs_len = singlepadcollate(predict_DTDs)
+        pad_ests_power, ests_power_len = singlepadcollate(ests_power)
+        pad_refs_power, refs_power_len = singlepadcollate(refs_power)
 
         recs_power, nears_power = self.raaec.frontend([recs, nears])
         return self.loss(
-            pad_predict_DTDs, pad_predict_masks, recs_power, nears_power, masks_len.sum()
+            pad_predict_DTDs, pad_predict_masks, 
+            recs_power, pad_refs_power, pad_ests_power, nears_power, masks_len.sum()
         )
 
     # def test_step(self, *args, **kwargs):

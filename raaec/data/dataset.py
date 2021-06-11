@@ -12,7 +12,7 @@ import numpy as np
 import torch.utils.data as tdata
 import timit_utils as tu
 
-from raaec.DSP.common_DSP import wav_norm
+from raaec.DSP.torch_DSP import lengths_sub
 from raaec.utils.set_config import hydra_runner
 
 class WAVDIRDATASET(tdata.Dataset):
@@ -125,18 +125,23 @@ class AECC_REAL_DATASET(tdata.Dataset):
                 ],
             fs=16000,
             dump_path=None,
+            length_align=True,
     ):
         super().__init__()
         self.audio_pairs = self.build(path, os.listdir(path), select) \
             if os.path.isdir(path) else self.load(path)
         if dump_path is not None:
             self.dump(dump_path)
+        self.length_align = length_align
+        self.fs = fs
 
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
         ref, _ = ta.load(audio_pair['ref'], normalize=False)
         rec, _ = ta.load(audio_pair['rec'], normalize=False)
         near, _ = ta.load(audio_pair['rec'], normalize=False)
+        if self.length_align:
+            ref, rec, near = lengths_sub([ref, rec, near])
         return ref.squeeze(0), rec.squeeze(0), near.squeeze(0)
 
     def __len__(self):

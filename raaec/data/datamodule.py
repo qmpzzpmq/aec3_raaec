@@ -62,10 +62,11 @@ class SinglePadCollate(object):
         return self.pad_collate(batch)
 
 class MulPadCollate(object):
-    def __init__(self, pad_choices, dim=0):
+    def __init__(self, pad_choices, dim=0, length_sub=False):
         super().__init__()
         self.dim = dim
         self.pad_choices = pad_choices
+        self.length_sub = length_sub
 
     def pad_collate(self, batch):
         # data extract
@@ -131,17 +132,17 @@ class TrainDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return tdata.DataLoader(
-            self.train_dataset, **self.data_loader_setting,
+            self.train_dataset, **self.data_loader_setting['train'],
             collate_fn=self.train_collect_fn)
 
     def val_dataloader(self):
         return tdata.DataLoader(
-            self.val_dataset, **self.data_loader_setting,
+            self.val_dataset, **self.data_loader_setting['val'],
             collate_fn=self.val_collect_fn)
 
     def test_dataloader(self):
         return tdata.DataLoader(
-            self.val_dataset, **self.data_loader_setting,
+            self.val_dataset, **self.data_loader_setting['test'],
             collate_fn=self.val_collect_fn)
     
 

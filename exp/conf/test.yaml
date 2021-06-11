@@ -65,9 +65,18 @@ optim:
 
 data:
     data_loader:
-        batch_size: 1
-        shuffle: True
-        num_workers: 0
+        train:
+            batch_size: 1
+            shuffle: true
+            num_workers: 0
+        val:
+            batch_size: 1
+            shuffle: true
+            num_workers: 0
+        test:
+            batch_size: 1
+            shuffle: true
+            num_workers: 0
     dataset:
         train: 
             - select: "AECC_REAL_DATASET"
@@ -113,7 +122,7 @@ callbacks:
         logging_interval: 'epoch'
 
 loggers:
-    tensorboard: false
+    tensorboard: true
     tensorboard_conf:
         'save_dir': '${base.tensorboard}/${name}'
     wandb: false

@@ -23,20 +23,36 @@ class MASK_DTD_LOSS(nn.Module):
 
     def forward(self, 
             pad_predict_DTDs, pad_predict_masks,
-            recs_power, nears_power, datas_sum):
-        recs_power = F.avg_pool2d(recs_power.unsqueeze(1), 4, 4).squeeze(1)
-        nears_power = F.avg_pool2d(nears_power.unsqueeze(1), 4, 4).squeeze(1)
+            recs_power, refc_power, ests_power, nears_power, 
+            datas_sum):
+        recs_power = F.avg_pool2d(
+            recs_power.unsqueeze(1), 4, 4, 1).squeeze(1)
+        nears_power = F.avg_pool2d(
+            nears_power.unsqueeze(1), (4,2), (4,2), 1).squeeze(1)
+        ests_power = F.avg_pool2d(
+            ests_power.unsqueeze(1), (4,2), (4,2), 1).squeeze(1)
         real_DTD = DTD_compute(recs_power, nears_power)
         loss_DTD = self.loss_DTD(
                 pad_predict_DTDs.view(-1, pad_predict_DTDs.size(-1)),
                 real_DTD.view(-1).long(),
-        ) / datas_sum
+        ) 
         # TODO: IAM -> PSM
+        real_masks= nears_power / ests_power
         loss_mask = self.loss_mask(
-            pad_predict_masks, nears_power / pad_predict_masks
-        ) / datas_sum
-        loss = (1- self.DTDweight) * loss_mask + self.DTDweight * loss_DTD
-        return {'loss': loss, 'loss_mask': loss_mask, "loss_DTD": loss_DTD}
+            pad_predict_masks, real_masks
+        ) 
+        loss_dict = {}
+        loss = 0
+        if not torch.isnan(loss_mask):
+            loss_mask /= datas_sum 
+            loss += (1- self.DTDweight) * loss_mask / datas_sum
+            loss_dict['loss_mask'] = loss_mask
+        if not torch.isnan(loss_DTD):
+            loss_DTD /= datas_sum 
+            loss += self.DTDweight * loss_DTD / datas_sum
+            loss_dict['loss_DTD'] = loss_DTD
+        loss_dict['loss'] = loss
+        return loss_dict
 
 def init_loss(loss_conf):
     loss_class = eval(loss_conf.get('select', 'nn.BCELoss'))
