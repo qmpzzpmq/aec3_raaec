@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torchaudio as ta
 
 from raaec.module.frontend import init_frontend
-
+from raaec.module.init import init_init
 from raaec.utils.set_config import hydra_runner
 from raaec.aec3.webrtc_aec3 import AEC3
 
@@ -89,7 +89,7 @@ class DTD_DEC(nn.Module):
 
 class AEC_MOBILENET(nn.Module):
     def __init__(
-            self, frontend_conf, af_conf,
+            self, frontend_conf, af_conf, init=None,
         ) -> None:
         super().__init__()
         self.frontend = init_frontend(frontend_conf)
@@ -106,6 +106,11 @@ class AEC_MOBILENET(nn.Module):
         self.enc = nn.Sequential(*enc_layers)
         self.masks_dec = MASK_DEC()
         self.DTD_dec = DTD_DEC()
+
+        if init is not None:
+            init_obj = init_init(init)
+            for submodule in [self.enc, self.masks_dec, self.DTD_dec]:
+                init_obj(submodule)
 
     # design for single inference
     def mask(self, ref, rec):

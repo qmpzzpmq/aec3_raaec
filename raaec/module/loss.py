@@ -56,7 +56,7 @@ class MASK_DTD_LOSS(nn.Module):
 
 def init_loss(loss_conf):
     loss_class = eval(loss_conf.get('select', 'nn.BCELoss'))
-    return loss_class(**loss_conf['loss_conf'])
+    return loss_class(**loss_conf['conf'])
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):

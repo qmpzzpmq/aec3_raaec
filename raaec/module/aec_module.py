@@ -16,7 +16,7 @@ from raaec.utils.set_config import hydra_runner
 def init_module(module_conf):
     module_select = module_conf.get('select', "mobilenet")
     if module_select == 'mobilenet':
-        return AEC_MOBILENET(**module_conf['module_conf'])
+        return AEC_MOBILENET(**module_conf['conf'])
     else:
         raise NotImplementedError(f"{module_select} haven't been implemented")
 
@@ -25,8 +25,8 @@ class RAAEC(pl.LightningModule):
         super().__init__()
         self.raaec = init_module(module_conf)
         if optim_conf is not None:
-            self.optim = init_optim(self.raaec, optim_conf)
-            self.scheduler = init_scheduler(self.optim, optim_conf)
+            self.optim = init_optim(self.raaec, optim_conf['optim'])
+            self.scheduler = init_scheduler(self.optim, optim_conf['scheduler'])
         if loss_conf is not None:
             self.loss = init_loss(loss_conf)
         self.save_hyperparameters()
