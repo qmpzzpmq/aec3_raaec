@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import torchaudio as ta
 import numpy as np
-
 import torch.utils.data as tdata
 import timit_utils as tu
 
@@ -137,9 +136,10 @@ class AECC_REAL_DATASET(tdata.Dataset):
 
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
+        logging.debug(f"reading data fron {audio_pair}")
         ref, _ = ta.load(audio_pair['ref'], normalize=False)
         rec, _ = ta.load(audio_pair['rec'], normalize=False)
-        near, _ = ta.load(audio_pair['rec'], normalize=False)
+        near, _ = ta.load(audio_pair['near'], normalize=False)
         if self.length_align:
             ref, rec, near = lengths_sub([ref, rec, near])
         return ref.squeeze(0), rec.squeeze(0), near.squeeze(0)
@@ -164,11 +164,18 @@ class AECC_REAL_DATASET(tdata.Dataset):
         return audio_pairs
 
     def build(self, dir, audio_list, select):
-        audio_items = [x.split("_")[0:-1] for x in audio_list \
-            if os.path.splitext(x)[1] in [".mp3", ",flac", ".wav"]]
-        for i, x in enumerate(audio_items):
-            assert len(x) > 1, f"x: {x}, i: {i}, item: {audio_items[i]}, list: {audio_list[i]}"
-        audio_items = [[x[0], "_".join(x[1:])] for x in audio_items]
+        audio_items = []
+        for file in audio_list:
+            if os.path.splitext(file)[1] not in [".mp3", ",flac", ".wav"]:
+                continue
+            for str_find in ['farend', 'nearend', 'doubletalk', 'sweep']:
+                str_idx = file.find(str_find)
+                if str_idx != -1:
+                    id = file[0:str_idx-1]
+                    audio_type = file[str_idx:].strip('.wav')
+                    audio_items.append([id, audio_type])
+                    break
+
         audio_pairs = {}
         for audio_item in audio_items:
             near_path = os.path.join(dir, f"{audio_item[0]}_nearend_singletalk_mic.wav")
@@ -188,7 +195,7 @@ class AECC_REAL_DATASET(tdata.Dataset):
                 out_pair = {
                     "ref": f"{prefix2}_lpb.wav",
                     "rec": f"{prefix2}_mic.wav",
-                    "near": near_path,
+                    "near": f"{prefix2}_nearend_singletalk_mic.wav",
                     }
                 if not (os.path.isfile(out_pair['ref']) and os.path.isfile(out_pair['rec'])):
                     logging.warning(f"{out_pair['ref']} or {out_pair['rec']} is not exist, skip")
@@ -196,38 +203,36 @@ class AECC_REAL_DATASET(tdata.Dataset):
                 out_pairs.append(out_pair)
         return out_pairs
 
-# class AECC_SYNTHETIC_DATASET(tdata.dataset):
-#     def __init__(self, csv_path):
-#         super().__init__()
-#         assert os.path.isfile(csv_path)
-#         base_dir = os.path.dirname(csv_path)
-# 
-# 
-#     def load(self, csv_path, base_dir):
+    def check(self):
+        for i in range(self.__len__()):
+            self.__getitem__(i)
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     train_datasets = []
-    for dataset in cfg['data']['dataset']['train']:
-        dataset_class = eval(f"{dataset['select']}")
-        train_datasets.append(
-            dataset_class(**dataset['conf'])
-        )
+    for dataset_conf in cfg['data']['dataset']['train']:
+        dataset_class = eval(f"{dataset_conf['select']}")
+        dataset = dataset_class(**dataset_conf['conf'])
+        dataset.check()
+        print(f"check done with in {dataset_conf}")
+        train_datasets.append(dataset)
 
     val_datasets = []
-    for dataset in cfg['data']['dataset']['val']:
-        dataset_class = eval(f"{dataset['select']}")
-        val_datasets.append(
-            dataset_class(**dataset['conf'])
-        )
+    for dataset_conf in cfg['data']['dataset']['val']:
+        dataset_class = eval(f"{dataset_conf['select']}")
+        dataset = dataset_class(**dataset_conf['conf'])
+        dataset.check()
+        print(f"check done with in {dataset_conf}")
+        val_datasets.append(dataset)
 
     test_datasets = []
-    for dataset in cfg['data']['dataset']['test']:
-        dataset_class = eval(f"{dataset['select']}")
-        test_datasets.append(
-            dataset_class(**dataset['conf'])
-        )    
+    for dataset_conf in cfg['data']['dataset']['test']:
+        dataset_class = eval(f"{dataset_conf['select']}")
+        dataset = dataset_class(**dataset_conf['conf'])
+        dataset.check()
+        print(f"check done with in {dataset_conf}")
+        test_datasets.append(dataset)
     
 
 if __name__ == "__main__":
