@@ -18,7 +18,8 @@ class LAYER_INIT:
     def __init__(self, init_class) -> None:
         self.init_class = init_class
 
-    def __call__(self, module):
-        for layer in module:
-            if type(layer) == nn.Conv2d:
-                conv_layer_init(layer, self.init_class)
+    def __call__(self, layer):
+        if isinstance(layer, nn.Conv2d):
+            conv_layer_init(layer, self.init_class)
+        elif isinstance(layer, nn.BatchNorm2d):
+            torch.nn.init.normal_(layer.bias.data)

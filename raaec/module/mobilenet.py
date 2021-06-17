@@ -28,7 +28,7 @@ class ConvBNReLU(nn.Sequential):
                 groups=groups, bias=False
             ),
             norm_layer(out_planes),
-            nn.ReLU6(inplace=True)
+            nn.ReLU(inplace=True)
         )
 
 class AEC_InvertedResidual(nn.Module):
@@ -89,11 +89,11 @@ class DTD_DEC(nn.Module):
 
 class AEC_MOBILENET(nn.Module):
     def __init__(
-            self, frontend_conf, af_conf, init=None,
+            self, frontend, af, init=None,
         ) -> None:
         super().__init__()
-        self.frontend = init_frontend(frontend_conf)
-        self.af = AEC3(**af_conf)
+        self.frontend = init_frontend(frontend)
+        self.af = AEC3(**af)
         enc_channels = [32, 64, 64, 128, 128]
         enc_strides = [(2, 2), (1, 1), (2, 2), (1, 1)]
         assert len(enc_channels) - 1 == len(enc_strides)
@@ -109,8 +109,8 @@ class AEC_MOBILENET(nn.Module):
 
         if init is not None:
             init_obj = init_init(init)
-            for submodule in [self.enc, self.masks_dec, self.DTD_dec]:
-                init_obj(submodule)
+            for module in self.modules():
+                init_obj(module)
 
     # design for single inference
     def mask(self, ref, rec):
@@ -133,7 +133,7 @@ class AEC_MOBILENET(nn.Module):
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
-    raaec = AEC_MOBILENET(**cfg['module']['module_conf'])
+    raaec = AEC_MOBILENET(**cfg['module']['conf'])
     raaec.train()
     ref, _ = ta.load('ref.wav', normalize=False)
     rec, _ = ta.load('ref.wav', normalize=False)

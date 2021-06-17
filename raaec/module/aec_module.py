@@ -40,7 +40,10 @@ class RAAEC(pl.LightningModule):
                 prog_bar=True, logger=True,
             )
             rename_loss[f"train_{k}"] = loss[k]
-        return loss['loss']
+        if loss['total'].isnan() or loss['total'] < 0:
+            return 
+        else:
+            return loss['total']
 
     def validation_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
@@ -50,7 +53,7 @@ class RAAEC(pl.LightningModule):
                 f"val_{k}", v, on_step=True, on_epoch=True, 
                 prog_bar=True, logger=True,
             )
-            rename_loss[f"train_{k}"] = loss[k]
+            rename_loss[f"val_{k}"] = loss[k]
 
     def loss_compute(self, batch):
         datas, datas_len = batch
