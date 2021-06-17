@@ -37,14 +37,10 @@ module:
     select: "mobilenet"
     conf:
         init:
-            select: 'nn.init.xavier_uniform'
-        af_conf:
+            select: 'nn.init.kaiming_uniform_' # 'nn.init.xavier_normal_' 'nn.init.xavier_uniform_' 'nn.init.kaiming_uniform_' 'nn.init.kaiming_normal_'
+        af:
             fs: 16000
-        frontend_conf:
-            agc:
-                select: 'FIXGAIN'
-                agc_conf:
-                    gain_index: 32768
+        frontend:
             fft:
                 fft_conf:
                     n_fft: 512
@@ -71,34 +67,43 @@ data:
     data_loader:
         train:
             batch_size: 1
-            shuffle: true
+            shuffle: false
             num_workers: 0
         val:
             batch_size: 1
-            shuffle: true
+            shuffle: false
             num_workers: 0
         test:
             batch_size: 1
-            shuffle: true
+            shuffle: false
             num_workers: 0
     dataset:
         train: 
             - select: "AECC_REAL_DATASET"
               conf:
-                  # path: "/data1/tanghaoyu/AEC-Challenge/datasets/real"
-                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/noisy"
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/real"
+                  select: # list selct, could be 'farend_singletalk' 'farend_singletalk_with_movement', 'doubletalk', 'doubletalk_with_movement',
+                  - 'farend_singletalk' 
                   dump_path: "train_real.list"
+                  align: false
+                  align_device: 'cuda:0'
+                  check: false
+            - select: "AECC_SYNTHETIC_DATASET"
+              conf:
+                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/synthetic"
+                  check: true
         val:
             - select: "AECC_REAL_DATASET"
               conf:
                   path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/clean"
                   dump_path: "val_test_clean.list"
+                  check: true
         test:
             - select: "AECC_REAL_DATASET"
               conf:
                   path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/noisy"
                   dump_path: "test_test_noisy.list"
-              
+                  check: false
 
 callbacks:
     progressbar: true
@@ -140,4 +145,6 @@ loggers:
         project_name: '${base.neptune}'
         experiment_name: '${name}'
         api_token: 'ANONYMOUS'
-         
+
+logging:
+    level: 'DEBUG'         
