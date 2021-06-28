@@ -54,6 +54,7 @@ loss:
         criterion_DTD: "nn.CrossEntropyLoss"
         criterion_mask: "nn.BCELoss"
         DTDweight: 0.3
+        real_mask_clip: true
 
 optim:
     optim:
@@ -81,31 +82,19 @@ data:
             num_workers: 0
     dataset:
         train: 
-            - select: "AECC_REAL_DATASET"
-              conf:
-                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/real"
-                  select: # list selct, could be 'farend_singletalk' 'farend_singletalk_with_movement', 'doubletalk', 'doubletalk_with_movement',
-                  - 'farend_singletalk' 
-                  dump_path: "train_real.list"
-                  align: false
-                  align_device: 'cuda:0'
-                  check: false
             - select: "AECC_SYNTHETIC_DATASET"
               conf:
                   path: "/data1/tanghaoyu/AEC-Challenge/datasets/synthetic"
                   split: 'train'
-                  check: true
+                  check: false
+                  scale: false
         val:
-            - select: "AECC_REAL_DATASET"
-              conf:
-                  path: "/data1/tanghaoyu/AEC-Challenge/datasets/blind_test_set/clean"
-                  dump_path: "val_test_clean.list"
-                  check: true
             - select: "AECC_SYNTHETIC_DATASET"
               conf:
                   path: "/data1/tanghaoyu/AEC-Challenge/datasets/synthetic"
                   split: 'test'
-                  check: true
+                  check: false
+                  scale: true
         test:
             - select: "AECC_REAL_DATASET"
               conf:
@@ -131,7 +120,7 @@ callbacks:
         mode: 'max'
         min_delta: 0.001
         patience: 5
-    gpu_stats: true
+    gpu_stats: false
     gpu_stats_conf:
         memory_utilization: true
         gpu_utilization: true
@@ -155,4 +144,4 @@ loggers:
         api_token: 'ANONYMOUS'
 
 logging:
-    level: 'DEBUG'         
+    level: 'INFO' 
