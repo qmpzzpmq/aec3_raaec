@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.nn as nn
 
@@ -11,6 +13,17 @@ class FIXGAIN(nn.Module):
         x_gain = x / self.gain_index
         return x_gain.float()
 
+class DummyGAIN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        logging.warning("using DummyGAIN")
+
+    def forward(self, x):
+        return x
+
 def init_agc(agc_conf):
-    agc_class = eval(f"{agc_conf.get('select', 'FIXGAIN')}")
-    return agc_class(**agc_conf['agc_conf'])
+    agc_select = agc_conf.get('select', 'FIXGAIN')
+    if agc_select == 'DummyGAIN':
+        return DummyGAIN()
+    agc_class = eval(agc_select)
+    return agc_class(**agc_conf['conf'])

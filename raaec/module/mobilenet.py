@@ -114,7 +114,7 @@ class AEC_MOBILENET(nn.Module):
 
     # design for single inference
     def mask(self, ref, rec):
-        est, _, = self.af.linear_run(
+        est, _, = self.af.run_float(
             ref.cpu().numpy(), rec.cpu().numpy()
         )
         est = torch.as_tensor(est, dtype=torch.float, device=ref.device)

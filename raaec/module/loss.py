@@ -9,17 +9,29 @@ import torch.nn.functional as F
 from raaec.DSP.torch_DSP import DTD_compute
 from raaec.utils.set_config import hydra_runner
 
+def mask_check(mask):
+    ill_idx = torch.logical_or(mask < 0, mask > 1)
+    return ill_idx.sum() == 0
+
 class MASK_DTD_LOSS(nn.Module):
-    def __init__(self, criterion_DTD, criterion_mask, DTDweight):
+    def __init__(
+            self,
+            criterion_DTD,
+            criterion_mask,
+            DTDweight,
+            real_mask_clip=False):
         super().__init__()
 
         loss_class = eval(criterion_DTD)
-        self.loss_DTD = loss_class(reduction="sum")
+        # self.loss_DTD = loss_class(reduction="sum")
+        self.loss_DTD = loss_class(reduction="none")
 
         loss_class = eval(criterion_mask)
-        self.loss_mask = loss_class(reduction="sum")
+        # self.loss_mask = loss_class(reduction="sum")
+        self.loss_mask = loss_class(reduction="none")
         assert DTDweight >= 0 and DTDweight <= 1, f""
         self.DTDweight = DTDweight
+        self.real_mask_clip = real_mask_clip
 
     def forward(self, 
             pad_predict_DTDs, pad_predict_masks,
@@ -35,23 +47,25 @@ class MASK_DTD_LOSS(nn.Module):
         loss_DTD = self.loss_DTD(
                 pad_predict_DTDs.view(-1, pad_predict_DTDs.size(-1)),
                 real_DTD.view(-1).long(),
-        ) 
+        ).sum()
         # TODO: IAM -> PSM
         real_masks= nears_power / ests_power
-        loss_mask = self.loss_mask(
-            pad_predict_masks, real_masks
-        ) 
+        if self.real_mask_clip:
+            real_masks = real_masks.clip(0, 1)
+        if not mask_check(pad_predict_masks):
+            raise ValueError(f"pad_predict_masks is not between 0 and 1")
+        if not mask_check(real_masks):
+            raise ValueError(f"real_masks is not between 0 and 1")
+        try:
+            loss_mask = self.loss_mask(
+                pad_predict_masks, real_masks
+            )
+        except Exception as e:
+            print(e)
         loss_dict = {}
-        loss = 0
-        if not torch.isnan(loss_mask):
-            loss_mask /= datas_sum 
-            loss += (1- self.DTDweight) * loss_mask / datas_sum
-            loss_dict['loss_mask'] = loss_mask
-        if not torch.isnan(loss_DTD):
-            loss_DTD /= datas_sum 
-            loss += self.DTDweight * loss_DTD / datas_sum
-            loss_dict['loss_DTD'] = loss_DTD
-        loss_dict['loss'] = loss
+        loss_dict['mask'] = loss_mask.sum() / datas_sum
+        loss_dict['DTD'] = loss_DTD.sum() / datas_sum
+        loss_dict['total'] = (1- self.DTDweight) * loss_dict['mask'] + self.DTDweight * loss_dict['DTD']
         return loss_dict
 
 def init_loss(loss_conf):

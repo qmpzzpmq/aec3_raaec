@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import csv
+from collections import OrderedDict
 
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
@@ -124,6 +125,7 @@ class AECC_SYNTHETIC_DATASET(tdata.Dataset):
             split='train',
             is_farend_noisy=[0, 1],
             is_nearend_noisy=[0,1],
+            fs = 16000,
             scale=False,
             check=False
         ):
@@ -133,9 +135,10 @@ class AECC_SYNTHETIC_DATASET(tdata.Dataset):
         assert split in ['train', 'test']
 
         self.scale = scale
+        self.fs = fs
         self.audio_pairs = []
         meta_csv = csv.DictReader(open(meta_path, "r"))
-        for row in meta_csv:
+        for i, row in enumerate(meta_csv):
             audio_pair = {}
             if row['split'] != split:
                 continue
@@ -151,7 +154,10 @@ class AECC_SYNTHETIC_DATASET(tdata.Dataset):
                 path, 'nearend_speech', f"nearend_speech_fileid_{row['fileid']}.wav")
             for v in audio_pair.values():
                 assert os.path.isfile(v), f"{v} file donesn't exists"
-            audio_pair['nearend_scale'] = row['nearend_scale']
+            nearend_scale = float(row['nearend_scale'])
+            assert type(nearend_scale) == float, \
+                f"the {i}th row's nearend_scale of {meta_path} is not float, is {row['nearend_scale']}"
+            audio_pair['near_scale'] = nearend_scale
             self.audio_pairs.append(audio_pair)
         if check:
             self.check()
@@ -163,10 +169,18 @@ class AECC_SYNTHETIC_DATASET(tdata.Dataset):
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
         logging.debug(f"reading data from {audio_pair}")
-        ref, _ = ta.load(audio_pair['ref'], normalize=False)
-        rec, _ = ta.load(audio_pair['rec'], normalize=False)
-        near, _ = ta.load(audio_pair['near'], normalize=False)
-        return ref.squeeze(0), rec.squeeze(0), near.squeeze(0)
+        signals = OrderedDict()
+        for signal_name in ('ref', 'rec', 'near'):
+            signal, fs = ta.load(audio_pair[signal_name], normalize=True)
+            if fs != self.fs:
+                logging.logging.warn(
+                    f""""the audio {audio_pair['signal_name']}'s sample frequency
+                    is not equal the system sample frequencey {self.fs}""")
+                signal = ta.functional.resample(signal, fs, self.fs)
+            signals[signal_name] = signal.squeeze(0)
+        if self.scale:
+            signals['near'] *= audio_pair['near_scale']
+        return list(signals.values())
 
     def check(self):
         logging.debug(f"checking data")
@@ -212,9 +226,9 @@ class AECC_REAL_DATASET(tdata.Dataset):
     def __getitem__(self, index):
         audio_pair = self.audio_pairs[index]
         logging.debug(f"reading data from {audio_pair}")
-        ref, _ = ta.load(audio_pair['ref'], normalize=False)
-        rec, _ = ta.load(audio_pair['rec'], normalize=False)
-        near, _ = ta.load(audio_pair['near'], normalize=False)
+        ref, _ = ta.load(audio_pair['ref'], normalize=True)
+        rec, _ = ta.load(audio_pair['rec'], normalize=True)
+        near, _ = ta.load(audio_pair['near'], normalize=True)
         return ref.squeeze(0), rec.squeeze(0), near.squeeze(0)
 
     def __len__(self):
@@ -311,6 +325,9 @@ class AECC_REAL_DATASET(tdata.Dataset):
 
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="test")
 def unit_test(cfg: DictConfig):
+    logging.basicConfig(
+        level=eval(f"logging.{cfg['logging'].get('level', 'INFO')}"),
+        format='%(asctime)s (%(module)s:%(lineno)d) %(levelname)s: %(message)s')
     logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
     train_datasets = []
     for dataset_conf in cfg['data']['dataset']['train']:

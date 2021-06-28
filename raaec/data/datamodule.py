@@ -128,7 +128,7 @@ class TrainDataModule(pl.LightningDataModule):
                 )
             self.test_dataset = tdata.ConcatDataset(datasets)
             self.test_collect_fn = MulPadCollate(
-                    pad_choices=[True] * 3, dim=0)
+                    pad_choices=[True] * 3 + [False] * 3, dim=0)
 
     def train_dataloader(self):
         return tdata.DataLoader(
@@ -143,7 +143,7 @@ class TrainDataModule(pl.LightningDataModule):
     def test_dataloader(self):
         return tdata.DataLoader(
             self.val_dataset, **self.data_loader_setting['test'],
-            collate_fn=self.val_collect_fn)
+            collate_fn=self.test_collect_fn)
     
 
 def init_datamodule(data_conf):

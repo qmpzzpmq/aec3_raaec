@@ -31,8 +31,17 @@ class RAAEC(pl.LightningModule):
             self.loss = init_loss(loss_conf)
         self.save_hyperparameters()
 
+    def on_train_epoch_start(self):
+        self.num_train_skip = 0
+
     def training_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
+        if loss is None:
+            self.num_train_skip += 1
+            self.log('train_skip', self.num_train_skip,
+                on_step=True, on_epoch=True, 
+                prog_bar=True, logger=True,)
+            return None
         rename_loss = {}
         for k, v in loss.items():
             self.log(
@@ -40,13 +49,19 @@ class RAAEC(pl.LightningModule):
                 prog_bar=True, logger=True,
             )
             rename_loss[f"train_{k}"] = loss[k]
-        if loss['total'].isnan() or loss['total'] < 0:
-            return 
-        else:
-            return loss['total']
+        return loss['total']
+
+    def on_validation_epoch_start(self):
+        self.num_val_skip = 0
 
     def validation_step(self, batch, batch_idx):
         loss = self.loss_compute(batch)
+        if loss is None:
+            self.num_val_skip += 1
+            self.log('val_skip', self.num_val_skip, 
+                on_step=True, on_epoch=True, 
+                prog_bar=True, logger=True,)
+            return None
         rename_loss = {}
         for k, v in loss.items():
             self.log(
@@ -66,10 +81,15 @@ class RAAEC(pl.LightningModule):
         for ref, rec in zip(refs, recs):
             predict_mask, predict_DTD, est_power, ref_power = self.raaec(
                 ref.squeeze(), rec.squeeze())
+            if (predict_mask.isnan().sum() 
+                    + predict_mask.isnan().sum()) > 0:
+                continue
             predict_masks.append(predict_mask)
             predict_DTDs.append(predict_DTD)
             ests_power.append(est_power)
             refs_power.append(ref_power)
+        if len(predict_masks) == 0:
+            return None
         pad_predict_masks, masks_len = singlepadcollate(predict_masks)
         pad_predict_DTDs, DTDs_len = singlepadcollate(predict_DTDs)
         pad_ests_power, ests_power_len = singlepadcollate(ests_power)

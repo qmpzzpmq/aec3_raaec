@@ -273,7 +273,8 @@ cdef class AEC3:
             self.fs, self.num_rec_channel,
             self.fs, self.num_rec_channel,
         )
-        for current in tqdm(range(total)):
+        #for current in tqdm(range(total)):
+        for current in range(total):
             start = current * self.samples_per_frame
             end = start + self.samples_per_frame
 
@@ -302,7 +303,7 @@ cdef class AEC3:
         del ref_buffer
         del rec_buffer
         del linear_buffer
-        return linear, out
+        return linear.squeeze(0), out.squeeze(0)
 
     def run_float(self, 
         ref,

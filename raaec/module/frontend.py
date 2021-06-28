@@ -7,8 +7,8 @@ from raaec.module.agc import init_agc
 class FRONTEND(nn.Module):
     def __init__(self, fft_conf, agc_conf):
         super().__init__()
-        self.fft = ta.transforms.Spectrogram(**fft_conf['fft_conf'], power=2)
         self.agc = init_agc(agc_conf)
+        self.fft = ta.transforms.Spectrogram(**fft_conf, power=2)
 
     def forward(self, signals):
         signals_power = []
