@@ -57,11 +57,16 @@ cdef extern from "modules/audio_processing/audio_buffer.h" namespace "webrtc":
             size_t buffer_num_channels,
             size_t output_num_frames)
 
-        size_t num_frames()
         void CopyFrom(
             const int16_t* const interleaved_data, const StreamConfig& stream_config)
-        void CopyTo(const StreamConfig& stream_config, float* const* stacked_data)
+        void CopyFrom(
+            const float* const* interleaved_data, const StreamConfig& stream_config)
         void CopyTo(const StreamConfig& stream_config, int16_t* const interleaved_data)
+        void CopyTo(const StreamConfig& stream_config, float* const* stacked_data)
+        size_t num_frames()
+        size_t num_channels()
+        size_t num_bands()
+        size_t num_frames_per_band()
 
 cdef extern from "modules/audio_processing/aec3/echo_canceller3.h" namespace "webrtc":
     cdef cppclass EchoCanceller3:

@@ -66,7 +66,7 @@ def main(cmd_args):
                 "-lc++abi",
             ],
             language="c++",
-            define_macros=[('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')]
+            # define_macros=[('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')]
             # extra_compile_args=["-std=c++14",  "-v"],
             # extra_link_args=["-stdlib=libc++", ],
         )
