@@ -12,7 +12,6 @@ from raaec.module.aec_module import RAAEC
 from raaec.data.datamodule import init_datamodule
 from raaec.utils.set_config import hydra_runner
 
-
 @hydra_runner(config_path=os.path.join(os.getcwd(), "conf"), config_name="train")
 def main(cfg: DictConfig):
     logging.basicConfig(

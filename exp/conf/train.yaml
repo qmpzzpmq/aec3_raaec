@@ -1,16 +1,18 @@
 name: "Test"
 
 base:
-    exp: 'test-exp'
-    tensorboard: 'test-tensorboard'
-    wandb: 'test-wandb'
-    neptune: 'test-neptune'
+    exp: 'exp'
+    tensorboard: 'tensorboard'
+    wandb: 'wandb'
+    neptune: 'neptune'
     seed: 777
 
 trainer:
     accelerator: 'ddp'
     accumulate_grad_batches: 1
     amp_backend: 'native' # 'native' 'apex'
+    max_epochs: 100
+    min_epochs: 5
     amp_level: 'O1'
     auto_lr_find: false
     auto_scale_batch_size: false
@@ -21,8 +23,6 @@ trainer:
     gpus: ???
     gradient_clip_val: 50
     gradient_clip_algorithm: 'norm'
-    max_epochs: 100
-    min_epochs: 5
     limit_train_batches: 1.0
     limit_val_batches: 1.0
     limit_test_batches: 1.0
@@ -58,13 +58,15 @@ loss:
 
 optim:
     optim:
-        select: "adam" # 'adam' 'sgd'
+        contiguous_params: false # unavailable currently
+        select: "optim.Adam" # 'optim.Adam' 'optim.SGD'
         conf:
             lr: 0.001
     scheduler:
         select: "lambdalr"
         conf:
            last_epoch: -1 
+           lr_lambda: 'lambda epoch: 0.95 ** epoch'
 
 data:
     data_loader:
@@ -109,14 +111,14 @@ callbacks:
         process_position: 0
     modelcheckpoint: true
     modelcheckpoint_conf:
-        filename: 'epoch{epoch}-val_loss{val_loss:.2f}' 
-        monitor: 'val_loss'
+        filename: 'epoch{epoch}-val_loss{val_total:.2f}' 
+        monitor: 'val_total'
         save_last: true
         save_top_k: 5
         dirpath: '${base.exp}/${name}'
     earlystopping: true
     earlystopping_conf:
-        monitor: 'val_loss'
+        monitor: 'val_total'
         mode: 'max'
         min_delta: 0.001
         patience: 5
@@ -129,13 +131,14 @@ callbacks:
         logging_interval: 'epoch'
 
 loggers:
-    tensorboard: true
+    tensorboard: false
     tensorboard_conf:
         'save_dir': '${base.tensorboard}/${name}'
     wandb: false
     wandb_conf:
         name: ${name}
         save_dir: '${base.wandb}'
+        project: 'raaec'
         log_model: true
     neptune: false
     neptune_conf:

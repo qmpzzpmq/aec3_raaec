@@ -3,25 +3,28 @@ import logging
 
 from omegaconf import DictConfig, OmegaConf
 import torch
+import torch.optim as optim
+from contiguous_params import ContiguousParams
 
 def init_optim(model, optim_conf):
-    optim_select = optim_conf.get('select', "adam")
+    optim_select = optim_conf.get('select', "optim.Adam")
     logging.warning(f"using {optim_select} builder")
-    if optim_select == "sgd":
-        return torch.optim.SGD(model.parameters(), **optim_conf['conf'])
-    elif optim_select == "adam":
-        return torch.optim.Adam(model.parameters(), **optim_conf['conf'])
-    else:
-        raise NotImplementedError(f"the optim policy {optim_select}")
+    optim_class = eval(optim_select)
+    parameters = ContiguousParams(model.parameters()) \
+        if optim_conf.get('contiguous_params', False) \
+        else model.parameters()
+    return optim_class(parameters, **optim_conf['conf'])
 
 def init_scheduler(optim, scheduler_conf):
     scheduler_select = scheduler_conf.get('scheduler_select', "lambdalr")
     if scheduler_select == "lambdalr":
-        lr_lambda = lambda epoch: 0.95 ** epoch
+        scheduler_conf = dict(scheduler_conf['conf'])
+        lr_lambda = scheduler_conf.pop('lr_lambda')
+        lr_lambda = eval(lr_lambda)
         return torch.optim.lr_scheduler.LambdaLR(
             optim,
             lr_lambda=lr_lambda,
-            **scheduler_conf['conf']
+            **scheduler_conf,
         )
     else:
         raise NotImplementedError(f"the scheduler policy {scheduler_select}")

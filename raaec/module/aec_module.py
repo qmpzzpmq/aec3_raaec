@@ -82,7 +82,7 @@ class RAAEC(pl.LightningModule):
             predict_mask, predict_DTD, est_power, ref_power = self.raaec(
                 ref.squeeze(), rec.squeeze())
             if (predict_mask.isnan().sum() 
-                    + predict_mask.isnan().sum()) > 0:
+                    + predict_DTD.isnan().sum()) > 0:
                 continue
             predict_masks.append(predict_mask)
             predict_DTDs.append(predict_DTD)
